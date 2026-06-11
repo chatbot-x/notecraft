@@ -8,9 +8,14 @@ A privacy-first, Obsidian-flavored markdown note-taking app built with Next.js 1
 
 ## Features
 
-- **Obsidian-flavored Markdown** — Callouts, wikilinks, comments, footnotes, math, mermaid diagrams, and more
+- **Obsidian-flavored Markdown** — Callouts, wikilinks, embeds, tags, block references, comments, footnotes, math, mermaid diagrams, and more
 - **Live Preview** — Split-pane editing with real-time rendered output (150ms debounced)
 - **Hybrid Rendering** — Obsidian-style Live Preview decorations in the editor (checkboxes, wikilinks, images, math, links)
+- **Obsidian Embeds** — Note transclusions (`![[note]]`), image embed+resize (`![[img.png|300]]`), heading/block embeds (`![[note#^id]]`)
+- **Obsidian Tags** — Inline tags (`#tag`, `#nested/tag`) rendered as clickable badges
+- **Block References** — Define blocks with `^block-id` and reference them from embeds
+- **Front Matter Properties** — YAML front matter rendered as a collapsible properties panel
+- **Code-block Admonitions** — `~~~ad-note` syntax as an alternative to blockquote callouts
 - **Callout Picker** — Toolbar dropdown with all 14 callout types, so you never have to memorize syntax
 - **Syntax Highlighting** — 40+ languages via Shiki (github-light / github-dark themes)
 - **Image Upload** — Drag-and-drop, paste, or click to upload (stored as data URLs in localStorage)
@@ -33,7 +38,7 @@ A privacy-first, Obsidian-flavored markdown note-taking app built with Next.js 1
 │  │  Sidebar  │   │   CodeMirror 6   │   │  Markdown Preview   │ │
 │  │          │   │                  │   │                     │ │
 │  │ • Notes  │   │ ┌──────────────┐ │   │  markdown-it        │ │
-│  │ • Search │   │ │  Toolbar     │ │   │  + 18 plugins       │ │
+│  │ • Search │   │ │  Toolbar     │ │   │  + 24 plugins       │ │
 │  │ • CRUD   │   │ │ (React Portal)│ │   │  + DOMPurify        │ │
 │  │          │   │ ├──────────────┤ │   │  + Shiki             │ │
 │  │          │   │ │  Editor      │ │   │  + Medium-zoom       │ │
@@ -54,7 +59,7 @@ Markdown text
      │
      ▼
 ┌──────────────────────────────┐
-│  markdown-it + 18 plugins    │  Step 1: Parse + Render
+│  markdown-it + 24 plugins    │  Step 1: Parse + Render
 │  (see Rendering Pipeline     │
 │   section below)             │
 └──────────────┬───────────────┘
@@ -62,8 +67,8 @@ Markdown text
                ▼
 ┌──────────────────────────────┐
 │  DOMPurify Sanitization      │  Step 2: XSS-safe output
-│  (118 allowed tags,          │
-│   63 allowed attrs)          │
+│  (120+ allowed tags,         │
+│   70+ allowed attrs)         │
 └──────────────┬───────────────┘
                │
                ▼
@@ -79,12 +84,13 @@ Markdown text
 │  • Medium-zoom (images)      │
 │  • Mermaid (diagrams)        │
 │  • Event delegation          │
+│  • Front matter display      │
 └──────────────────────────────┘
 ```
 
 ---
 
-## Rendering Pipeline — 18 Plugins
+## Rendering Pipeline — 24 Plugins
 
 NoteCraft uses **markdown-it** as its rendering engine with a plugin pipeline that combines the best of the markdown-it ecosystem with algorithms backported from the Remark/Astro ecosystem. The principle: *markdown-it is the engine, Remark is the reference implementation* — we study how Remark plugins handle edge cases, then implement the same logic in markdown-it's token stream model.
 
@@ -102,7 +108,7 @@ NoteCraft uses **markdown-it** as its rendering engine with a plugin pipeline th
 | 8 | [`markdown-it-emoji`](https://github.com/markdown-it/markdown-it-emoji) | ^3.0.0 | `:rocket:` → 🚀 | Emoji shortcuts (full Unicode set) |
 | 9 | [`markdown-it-deflist`](https://github.com/markdown-it/markdown-it-deflist) | ^3.0.1 | `Term\n: Definition` | Definition lists |
 | 10 | [`@traptitech/markdown-it-katex`](https://github.com/traptitech/markdown-it-katex) | ^3.6.0 | `$...$` / `$$...$$` | KaTeX math rendering |
-| 11 | [`markdown-it-wikilinks`](https://github.com/jsepia/markdown-it-wikilinks) | ^1.4.0 | `[[note name]]` | Obsidian-style wikilinks |
+| 11 | [`markdown-it-wikilinks`](https://github.com/jsepia/markdown-it-wikilinks) | ^1.4.0 | `[[note name]]` | Obsidian-style wikilinks (with `#heading` and `|alias` support) |
 
 ### Custom Plugins (built in-house, backported from Remark ecosystem)
 
@@ -112,14 +118,20 @@ NoteCraft uses **markdown-it** as its rendering engine with a plugin pipeline th
 | 13 | **Comment Plugin** | [`comment-plugin.ts`](src/lib/renderer/comment-plugin.ts) | `%%hidden%%` | Original — Obsidian `%%comment%%` behavior |
 | 14 | **Mermaid Plugin** | [`mermaid-plugin.ts`](src/lib/renderer/mermaid-plugin.ts) | ` ```mermaid ` | Original — lazy-load placeholder pattern |
 | 15 | **Heading ID Plugin** | [`heading-id-plugin.ts`](src/lib/renderer/heading-id-plugin.ts) | `## Heading {#custom-id}` | Original — mirrors [`github-slugger`](https://github.com/Flet/github-slugger) algorithm |
+| 16 | **Tag Plugin** | [`tag-plugin.ts`](src/lib/renderer/tag-plugin.ts) | `#tag`, `#nested/tag` | [`@moritzrs/remark-ofm`](https://github.com/MoritzRS/remark-ofm) — OFM tags; [`markdown-it-hashtag`](https://github.com/svbergerhem/markdown-it-hashtag) — existing markdown-it reference |
+| 17 | **Embed Plugin** | [`embed-plugin.ts`](src/lib/renderer/embed-plugin.ts) | `![[note]]`, `![[img.png\|300]]`, `![[note#^id]]` | [`remark-obsidian-md`](https://github.com/MoritzRS/remark-obsidian-md) — embed rendering; [`@heavycircle/remark-obsidian`](https://github.com/heavycircle/remark-obsidian) — block reference embeds |
+| 18 | **Block Reference Plugin** | [`block-ref-plugin.ts`](src/lib/renderer/block-ref-plugin.ts) | `^block-id` | [`@heavycircle/remark-obsidian`](https://github.com/heavycircle/remark-obsidian) — block reference syntax |
+| 19 | **Admonition Plugin** | [`admonition-plugin.ts`](src/lib/renderer/admonition-plugin.ts) | `~~~ad-note` | [`ebullient/markdown-it-obsidian-callouts`](https://github.com/ebullient/markdown-it-obsidian-callouts) — code-block admonition syntax; [Obsidian Admonition plugin](https://github.com/valentine195/obsidian-admonition) — original syntax |
+| 20 | **Front Matter Display** | [`frontmatter-display.ts`](src/lib/renderer/frontmatter-display.ts) | YAML → `<details>` panel | [`remark-obsidian-md`](https://github.com/MoritzRS/remark-obsidian-md) — frontmatter as `<details>` UI |
 
 ### Post-Processing Pipeline (not markdown-it plugins)
 
 | # | Component | Package | Description |
 |---|-----------|---------|-------------|
-| 16 | **Syntax Highlighting** | [`shiki`](https://github.com/shikijs/shiki) ^4.2.0 | Async code highlighting, 40 languages, github-light/dark themes |
-| 17 | **XSS Sanitization** | [`dompurify`](https://github.com/cure53/DOMPurify) ^3.4.9 | 118 allowed tags, 63 allowed attrs, custom data-attributes |
-| 18 | **Image Zoom** | [`medium-zoom`](https://github.com/francoischalifour/medium-zoom) ^1.1.0 | Click-to-zoom on preview images |
+| 21 | **Syntax Highlighting** | [`shiki`](https://github.com/shikijs/shiki) ^4.2.0 | Async code highlighting, 40 languages, github-light/dark themes |
+| 22 | **XSS Sanitization** | [`dompurify`](https://github.com/cure53/DOMPurify) ^3.4.9 | 120+ allowed tags, 70+ allowed attrs, custom data-attributes |
+| 23 | **Image Zoom** | [`medium-zoom`](https://github.com/francoischalifour/medium-zoom) ^1.1.0 | Click-to-zoom on preview images |
+| 24 | **Event Delegation** | — | Click handlers for wikilinks, tags, embeds, task toggles, heading jumps |
 
 ---
 
@@ -172,6 +184,178 @@ The crown jewel of our custom plugin work. Implements Obsidian-style callouts wi
 
 ---
 
+### Tag Plugin
+
+Renders Obsidian-style inline tags as clickable badges with context-aware parsing to avoid false positives.
+
+**Syntax:**
+
+```markdown
+This note is about #productivity and #project/ideas
+Tags support #nested/paths and #under_scores
+Not matched: #heading (at line start), #123 (starts with digit)
+```
+
+**How it works:**
+
+- Tags must be preceded by whitespace, start of string, or punctuation (`(`, `[`, `{`, `,`, `;`, `:`, `>`, `"`, `'`)
+- Tag names must start with a letter or underscore, and can contain letters, digits, underscores, hyphens, and forward slashes (for nested tags)
+- Heading `#` markers are not matched (consumed by the block parser before inline processing)
+- Tags inside code spans (`` `code` ``) are not matched (different token type)
+- Rendered as `<a class="obsidian-tag" data-tag="tagName" href="#tagName">#tagName</a>`
+
+**What was backported:**
+
+- **From [`@moritzrs/remark-ofm`](https://github.com/MoritzRS/remark-ofm):** The context-aware tag detection algorithm — ensuring `#` only triggers tag rendering when it appears in an inline context (not as a heading marker or inside code)
+- **From [`markdown-it-hashtag`](https://github.com/svbergerhem/markdown-it-hashtag):** The text node scanning approach — splitting text tokens at tag boundaries and emitting `tag_open`/`tag_close` token pairs
+
+**Architecture:** Core rule `obsidian_tags` after `inline`. Scans all text children of inline tokens for `#` characters, validates context and tag name pattern, then splits text nodes into segments of plain text and tag links. Registers `tag_open`/`tag_close` renderers that output `<a>` elements with `data-tag` attributes.
+
+---
+
+### Embed Plugin
+
+Implements Obsidian's transclusion/embed syntax, supporting note embeds, image embeds with resizing, and heading/block reference embeds.
+
+**Syntax:**
+
+```markdown
+![[meeting-notes]]                 — embed an entire note
+![[meeting-notes#Agenda]]          — embed a heading section from a note
+![[meeting-notes#^summary]]        — embed a specific block by ID
+![[#Introduction]]                 — embed a heading from the current note
+![[#^intro-block]]                 — embed a block from the current note
+![[screenshot.png]]                — embed an image
+![[diagram.png|400]]               — embed an image with width 400px
+![[chart.png|800x600]]             — embed an image with width x height
+![[demo.mp4]]                      — embed a video
+![[podcast.mp3]]                   — embed audio
+```
+
+**Image & Media Detection:**
+
+The plugin automatically detects embed types by file extension:
+- **Images:** `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.bmp`, `.ico`, `.avif`, `.tiff` — rendered as `<img>` with optional `width`/`height`
+- **Audio:** `.mp3`, `.wav`, `.m4a`, `.flac`, `.ogg` — rendered as `<audio controls>`
+- **Video:** `.mp4`, `.webm`, `.ogg` — rendered as `<video controls>` with optional dimensions
+- **Notes:** Everything else — rendered as a placeholder `<div class="embed-note">` with `data-embed-src`, `data-embed-type`, `data-embed-heading`, and `data-embed-block` attributes for client-side resolution
+
+**What was backported:**
+
+- **From [`remark-obsidian-md`](https://github.com/MoritzRS/remark-obsidian-md):** The embed rendering pattern — `<div class="embed-note">` with a header showing the note title and a content placeholder for lazy resolution
+- **From [`@heavycircle/remark-obsidian`](https://github.com/heavycircle/remark-obsidian):** Block reference embed handling (`![[note#^blockid]]`) with `data-embed-block` attributes
+
+**Architecture:** Core rule `obsidian_embeds` after `inline`, registered **after** the wikilinks plugin. Detects the pattern of a text token ending with `!` immediately before a wikilink's `link_open` token. Strips the `!` from the text token, parses the wikilink's href and display text to determine embed type (image/media/note), then replaces the wikilink tokens with the appropriate embed HTML. Image size is parsed from the `|alias` portion of the wikilink (e.g., `|300` or `|300x200`).
+
+---
+
+### Block Reference Plugin
+
+Implements Obsidian's block ID definition syntax, enabling paragraphs to be anchor targets for block-level transclusions.
+
+**Syntax:**
+
+```markdown
+This is a paragraph that can be referenced.
+^abc123
+
+Another paragraph ^inline-id
+
+![[other-note#^abc123]]  ← this is handled by the embed plugin
+```
+
+**Two forms:**
+
+1. **Standalone block ID** — `^block-id` on its own line attaches to the preceding block (paragraph, heading, blockquote, or list item). The standalone paragraph is removed, and the preceding block receives a `data-block-id` attribute.
+2. **Inline block ID** — `^block-id` at the end of a paragraph with other content. The `^block-id` is stripped from visible output, and the paragraph receives a `data-block-id` attribute.
+
+**Optional indicator:** When `showIndicator` is enabled (default), a subtle `<span class="block-ref-id">` is appended to the block content, showing the block ID for reference. This can be styled or hidden via CSS.
+
+**What was backported:**
+
+- **From [`@heavycircle/remark-obsidian`](https://github.com/heavycircle/remark-obsidian):** The block reference definition pattern — `^id` at the end of a paragraph, standalone vs. inline distinction, and the attribute-based anchor system
+
+**Architecture:** Core rule `block_refs` after `inline`. Scans for `paragraph_open` tokens, inspects their inline content for `^block-id` patterns at the end of the text, then either moves the attribute to the preceding block (standalone) or strips it from the visible content (inline). Registers `block_ref_indicator`/`block_ref_indicator_close` renderers for the optional ID indicator.
+
+---
+
+### Admonition Plugin
+
+Provides code-block style admonitions as an alternative to the blockquote callout syntax. This supports the Obsidian Admonition plugin's `~~~ad-*` convention.
+
+**Syntax:**
+
+````markdown
+~~~ad-note
+Title: Important Note
+Content here with **markdown** support
+~~~
+
+~~~ad-warning "Custom Title"
+Warning content
+~~~
+
+~~~ad-tip
+Auto-generated title from type
+~~~
+~~``
+
+**Title parsing:**
+
+The first line of content is checked for a title in this order:
+1. `"Title: My Title"` — key-value format
+2. `"My Title"` — quoted string
+3. No title — auto-generated from the type (e.g., `ad-tip` → "Tip")
+
+**Type resolution:** Uses the same 14 canonical types and 18 aliases as the callout plugin (e.g., `ad-hint` resolves to `tip`, `ad-error` resolves to `danger`). Unknown types fall back to the `note` icon.
+
+**What was backported:**
+
+- **From [`ebullient/markdown-it-obsidian-callouts`](https://github.com/ebullient/markdown-it-obsidian-callouts):** The `ad-` prefix detection pattern and the title parsing algorithm
+- **From [Obsidian Admonition plugin](https://github.com/valentine195/obsidian-admonition):** The original `~~~ad-type` syntax specification
+
+**Architecture:** Intercepts the `fence` renderer. If the info string starts with `ad-`, the fence is transformed into a callout-style `<div>` with the same CSS classes as blockquote callouts (plus an `admonition-code` class for styling overrides). The body content is re-rendered through markdown-it for inline formatting. Non-admonition fences fall through to the default renderer.
+
+---
+
+### Front Matter Display
+
+Renders YAML front matter as a collapsible properties panel at the top of the document, mirroring Obsidian's reading mode properties view.
+
+**Syntax:**
+
+```markdown
+---
+title: My Note
+tags: [productivity, ideas]
+created: 2025-01-15
+priority: 3
+published: true
+---
+
+Note content starts here...
+```
+
+**Rendered output:** A `<details open>` panel containing a table of key-value pairs, with type-aware styling for each value type:
+
+| Value Type | CSS Class | Example |
+|-----------|-----------|---------|
+| String | `.frontmatter-string` | `My Note` |
+| Number | `.frontmatter-number` | `3` |
+| Boolean | `.frontmatter-boolean` | `true` |
+| Date | `.frontmatter-date` | `2025-01-15` |
+| Array | `.frontmatter-array` → `.frontmatter-tag` | `[productivity, ideas]` |
+| Null | `.frontmatter-null` | `null` |
+| Empty array | `.frontmatter-empty` | `[]` |
+
+**What was backported:**
+
+- **From [`remark-obsidian-md`](https://github.com/MoritzRS/remark-obsidian-md):** The `<details>`/`<summary>` pattern for collapsible front matter display
+
+**Architecture:** This is NOT a markdown-it plugin — it is a post-processing step in the `renderMarkdown()` function. After the markdown-it render and DOMPurify sanitization, if front matter data was extracted (by `markdown-it-front-matter`), the `renderFrontMatterDisplay()` function generates a styled HTML block that is prepended to the output. The YAML parser handles arrays (`[a, b, c]`), booleans (`true`/`false`), and numbers.
+
+---
+
 ### Comment Plugin
 
 Strips or hides Obsidian-style inline comments from rendered output.
@@ -221,6 +405,21 @@ Auto-generates GitHub-style slug IDs for all headings, with deduplication suppor
 ```
 
 **Architecture:** Overrides the `heading_open` renderer, generates a slug from inline content using a custom algorithm (strip HTML → remove non-word → lowercase → spaces to hyphens → collapse hyphens), deduplicates via an `env.__headingSlugs` Map that appends `-1`, `-2`, etc. Custom IDs via `{#id}` attribute syntax are preserved with priority. Uses [`github-slugger`](https://github.com/Flet/github-slugger) internally.
+
+---
+
+## Wikilink Enhancements
+
+The `markdown-it-wikilinks` plugin is configured with an enhanced `linkPattern` that supports:
+
+```markdown
+[[note name]]           → basic wikilink
+[[note#heading]]        → heading reference (data-wikilink-heading attribute)
+[[note#^blockid]]       → block reference (data-wikilink-block attribute)
+[[note|display text]]   → alias (display text shown, note used for href)
+```
+
+The custom `link_open` renderer adds `data-wikilink-heading` and `data-wikilink-block` attributes to wikilink `<a>` tags when the href contains a `#` fragment, enabling the preview component to distinguish between regular wikilinks, heading references, and block references for click handling.
 
 ---
 
@@ -300,25 +499,42 @@ const result = await renderMarkdown(content, {
   isDark: true,
   wikilinkBase: '/',
   onWikilinkClick: (pageName) => router.push(pageName),
+  onTagClick: (tagName) => console.log('Tag clicked:', tagName),
+  onEmbedClick: (source, heading, blockId) => console.log('Embed clicked:', source),
   features: {
-    math: true,         // KaTeX ($...$, $$...$$)
-    mermaid: true,      // Mermaid diagrams
-    callouts: true,     // Obsidian callouts
-    wikilinks: true,    // [[wikilinks]]
-    footnotes: true,    // [^1] footnotes
-    taskLists: true,    // GFM task lists
-    headingIds: true,   // Auto heading anchors
-    attrs: true,        // {.class #id}
-    sub: true,          // H~2~O subscript
-    sup: true,          // E=mc^2^ superscript
-    mark: true,         // ==highlight==
-    emoji: true,        // :rocket: emoji
-    deflist: true,      // Definition lists
-    frontMatter: true,  // YAML front matter
-    comments: true,     // %%hidden%% comments
+    math: true,              // KaTeX ($...$, $$...$$)
+    mermaid: true,           // Mermaid diagrams
+    callouts: true,          // Obsidian callouts (> [!note])
+    wikilinks: true,         // [[wikilinks]]
+    footnotes: true,         // [^1] footnotes
+    taskLists: true,         // GFM task lists
+    headingIds: true,        // Auto heading anchors
+    attrs: true,             // {.class #id}
+    sub: true,               // H~2~O subscript
+    sup: true,               // E=mc^2^ superscript
+    mark: true,              // ==highlight==
+    emoji: true,             // :rocket: emoji
+    deflist: true,           // Definition lists
+    frontMatter: true,       // YAML front matter extraction
+    frontMatterDisplay: true, // Front matter properties panel
+    comments: true,          // %%hidden%% comments
+    tags: true,              // Obsidian inline tags (#tag)
+    embeds: true,            // Obsidian embeds (![[note]])
+    blockRefs: true,         // Block references (^block-id)
+    admonitions: true,       // Code-block admonitions (~~~ad-note)
   },
 })
 ```
+
+### Callbacks
+
+The renderer supports several callbacks for interactive behavior:
+
+| Callback | Trigger | Parameters |
+|----------|---------|------------|
+| `onWikilinkClick` | Wikilink `<a>` clicked | `pageName: string` |
+| `onTagClick` | Tag badge `<a>` clicked | `tagName: string` |
+| `onEmbedClick` | Note embed `<div>` clicked | `source: string, heading?: string, blockId?: string` |
 
 ### Custom Toolbar Items
 
@@ -409,15 +625,23 @@ To add a new callout type that renders in the preview:
    { type: 'custom', icon: '\u{1F680}', label: 'Custom', color: 'text-purple-500' },
    ```
 
+4. **Add to the admonition plugin** in [`admonition-plugin.ts`](src/lib/renderer/admonition-plugin.ts):
+   ```ts
+   const CALLOUT_ICONS = {
+     // ...existing types
+     custom: '\u{1F680}',
+   }
+   ```
+
 ---
 
 ## Security
 
 All rendered HTML passes through DOMPurify with a carefully curated allowlist:
 
-- **118 allowed tags** — Standard HTML, KaTeX MathML, Mermaid SVG elements
-- **63 allowed attributes** — Including `aria-*` and `data-*` wildcards
-- **Custom data attributes** — `data-mermaid-source`, `data-callout`, `data-callout-foldable`, `data-callout-collapsed`, `data-code`, `data-lang`
+- **120+ allowed tags** — Standard HTML, KaTeX MathML, Mermaid SVG elements
+- **70+ allowed attributes** — Including `aria-*` and `data-*` wildcards
+- **Custom data attributes** — `data-mermaid-source`, `data-callout`, `data-callout-foldable`, `data-callout-collapsed`, `data-admonition`, `data-code`, `data-lang`, `data-tag`, `data-embed-src`, `data-embed-type`, `data-embed-heading`, `data-embed-block`, `data-embed-placeholder`, `data-block-id`, `data-wikilink-heading`, `data-wikilink-block`
 - **Data URI support** — Allowed for `<img>` tags (base64 uploads)
 - **Lazy DOMPurify loading** — Uses `require('dompurify')` to avoid `jsdom` dependency on Cloudflare Workers edge runtime
 
@@ -468,7 +692,7 @@ All rendered HTML passes through DOMPurify with a carefully curated allowlist:
 ```
 src/
 ├── app/
-│   ├── globals.css              # Global styles + callout CSS + code block CSS
+│   ├── globals.css              # Global styles + callout/tag/embed/frontmatter CSS + code block CSS
 │   ├── layout.tsx               # Root layout with theme provider
 │   └── page.tsx                 # Entry point
 ├── components/
@@ -489,6 +713,11 @@ src/
 │   │   ├── comment-plugin.ts    # Custom %%comment%% plugin
 │   │   ├── mermaid-plugin.ts    # Custom Mermaid placeholder plugin
 │   │   ├── heading-id-plugin.ts # Custom heading anchor plugin
+│   │   ├── tag-plugin.ts        # Custom Obsidian tag plugin (#tag, #nested/tag)
+│   │   ├── embed-plugin.ts      # Custom Obsidian embed plugin (![[note]], ![[img.png|300]])
+│   │   ├── block-ref-plugin.ts  # Custom block reference plugin (^block-id)
+│   │   ├── admonition-plugin.ts # Custom code-block admonition plugin (~~~ad-note)
+│   │   ├── frontmatter-display.ts # Front matter properties panel renderer
 │   │   └── code-highlighter.ts  # Shiki async post-processor
 │   ├── codemirror-ext/
 │   │   ├── index.ts             # Barrel export
@@ -533,7 +762,12 @@ src/
 - [`@r4ai/remark-callout`](https://github.com/r4ai/remark-callout) — Callout regex, foldable `<details>/<summary>`, parseCallout algorithm
 - [`flowershow/remark-callouts`](https://github.com/flowershow/remark-callouts) — Type alias mapping system
 - [`remark-obsidian-callout`](https://github.com/MoritzRS/remark-obsidian-callout) — Data attributes for callout metadata
-- [`remark-obsidian-md`](https://github.com/MoritzRS/remark-obsidian-md) — Foldable chevron indicator
+- [`remark-obsidian-md`](https://github.com/MoritzRS/remark-obsidian-md) — Foldable chevron indicator, embed rendering, frontmatter display
+- [`@moritzrs/remark-ofm`](https://github.com/MoritzRS/remark-ofm) — OFM tags plugin (context-aware tag detection)
+- [`@heavycircle/remark-obsidian`](https://github.com/heavycircle/remark-obsidian) — Block reference syntax and handling
+- [`ebullient/markdown-it-obsidian-callouts`](https://github.com/ebullient/markdown-it-obsidian-callouts) — Code-block admonition syntax
+- [Obsidian Admonition plugin](https://github.com/valentine195/obsidian-admonition) — Original `~~~ad-*` syntax
+- [`markdown-it-hashtag`](https://github.com/svbergerhem/markdown-it-hashtag) — Text node scanning approach for tags
 
 ### CodeMirror Ecosystem
 
