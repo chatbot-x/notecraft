@@ -349,6 +349,14 @@ export function NoteApp() {
                       // Scroll to heading in the editor (future: scroll sync)
                       console.log('[Heading] Click:', headingId)
                     }}
+                    onTagClick={(tagName) => {
+                      // TODO: Search for notes with matching tag
+                      console.log('[Tag] Search for:', tagName)
+                    }}
+                    onEmbedClick={(source, heading, blockId) => {
+                      // TODO: Load and render the embedded note
+                      console.log('[Embed] Navigate to:', source, heading, blockId)
+                    }}
                   />
                 </div>
               )}

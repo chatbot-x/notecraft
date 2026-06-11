@@ -16,6 +16,10 @@ interface MarkdownPreviewProps {
   onTaskToggle?: (lineNumber: number, checked: boolean) => void
   /** Callback when a heading is clicked (for scroll sync) */
   onHeadingClick?: (headingId: string) => void
+  /** Callback when an Obsidian tag is clicked */
+  onTagClick?: (tagName: string) => void
+  /** Callback when an embed note is clicked */
+  onEmbedClick?: (source: string, heading?: string, blockId?: string) => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -27,6 +31,8 @@ export function MarkdownPreview({
   onWikilinkClick,
   onTaskToggle,
   onHeadingClick,
+  onTagClick,
+  onEmbedClick,
 }: MarkdownPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [renderResult, setRenderResult] = useState<RenderResult>({ html: '', headings: [], frontMatter: null })
@@ -200,6 +206,48 @@ export function MarkdownPreview({
         return
       }
 
+      // ── Obsidian tag click ───────────────────────────────────────
+      const tagEl = target.closest('a.obsidian-tag') as HTMLAnchorElement | null
+      if (tagEl) {
+        e.preventDefault()
+        const tagName = tagEl.dataset.tag
+        if (tagName) {
+          onTagClick?.(tagName)
+        }
+        return
+      }
+
+      // ── Embed note click ─────────────────────────────────────────
+      const embedNote = target.closest('.embed-note-header') as HTMLElement | null
+      if (embedNote) {
+        e.preventDefault()
+        const embedContainer = embedNote.closest('.embed-note') as HTMLElement | null
+        if (embedContainer) {
+          const source = embedContainer.dataset.embedSrc
+          const heading = embedContainer.dataset.embedHeading
+          const blockId = embedContainer.dataset.embedBlock
+          if (source) {
+            onEmbedClick?.(source, heading, blockId)
+          }
+        }
+        return
+      }
+
+      // ── Block reference indicator click ──────────────────────────
+      const blockRef = target.closest('.block-ref-id') as HTMLElement | null
+      if (blockRef) {
+        e.preventDefault()
+        const blockId = blockRef.dataset.blockId
+        if (blockId) {
+          // Navigate to or highlight the block
+          const targetEl = containerRef.current?.querySelector(`[data-block-id="${blockId}"]`)
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }
+        return
+      }
+
       // ── Wikilink click ───────────────────────────────────────────
       const wikilink = target.closest('a.wikilink') as HTMLAnchorElement | null
       if (wikilink) {
@@ -207,7 +255,7 @@ export function MarkdownPreview({
         const href = wikilink.getAttribute('href')
         if (href) {
           // Extract page name from href (strip leading /)
-          const pageName = href.replace(/^\//, '')
+          const pageName = href.replace(/^\//, '').split('#')[0]
           onWikilinkClick?.(pageName)
         }
         return
@@ -223,7 +271,7 @@ export function MarkdownPreview({
 
     container.addEventListener('click', handleClick)
     return () => container.removeEventListener('click', handleClick)
-  }, [onWikilinkClick, onTaskToggle, onHeadingClick])
+  }, [onWikilinkClick, onTaskToggle, onHeadingClick, onTagClick, onEmbedClick])
 
   // ─── Empty State ─────────────────────────────────────────────────────
 

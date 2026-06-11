@@ -1,13 +1,19 @@
 /**
  * NoteCraft Rendering Engine — markdown-it + plugin pipeline
  *
- * Industrial-grade Markdown rendering with 18 plugins:
+ * Industrial-grade Markdown rendering with 24 plugins:
  * - GFM (tables, strikethrough, task lists, autolinks)
  * - KaTeX math ($...$ and $$...$$)
  * - Mermaid diagrams (lazy-loaded)
  * - Obsidian-style callouts (> [!note], > [!warning]+, > [!danger]-)
  *   with foldable support, type aliases, and data attributes
- * - Wikilinks ([[note name]])
+ * - Code-block admonitions (~~~ad-note)
+ * - Wikilinks ([[note name]], [[note#heading]], [[note|alias]])
+ * - Obsidian embeds (![[note]], ![[image.png|300]], ![[note#^blockid]])
+ * - Obsidian tags (#tag, #nested/tag)
+ * - Obsidian block references (^block-id)
+ * - Obsidian comments (%%hidden%%)
+ * - Front matter properties display (rendered as collapsible panel)
  * - Footnotes ([^1])
  * - Heading anchors with auto-generated IDs
  * - Subscript, superscript, highlighted text
@@ -15,7 +21,6 @@
  * - Emoji shortcuts (:rocket: → 🚀)
  * - Definition lists (Term / : Definition)
  * - YAML front matter (--- title: ... ---)
- * - Obsidian comments (%%hidden%%)
  * - XSS-safe output via DOMPurify
  * - Syntax highlighting via Shiki (async post-processing)
  *
@@ -67,7 +72,12 @@ import mermaidPlugin from './mermaid-plugin'
 import calloutPlugin from './callout-plugin'
 import commentPlugin from './comment-plugin'
 import headingIdPlugin from './heading-id-plugin'
+import tagPlugin from './tag-plugin'
+import embedPlugin from './embed-plugin'
+import blockRefPlugin from './block-ref-plugin'
+import admonitionPlugin from './admonition-plugin'
 import { highlightAllCodeBlocks } from './code-highlighter'
+import { renderFrontMatterDisplay } from './frontmatter-display'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +88,10 @@ export interface RenderOptions {
   wikilinkBase?: string
   /** Called when a wikilink is clicked in the preview. Receives the page name. */
   onWikilinkClick?: (pageName: string) => void
+  /** Called when an Obsidian tag is clicked. Receives the tag name. */
+  onTagClick?: (tagName: string) => void
+  /** Called when an embed note is clicked. Receives the source path. */
+  onEmbedClick?: (source: string, heading?: string, blockId?: string) => void
   /** Parsed front matter data (if YAML header exists) */
   frontMatter?: Record<string, unknown>
   /** Enable/disable specific features */
@@ -97,6 +111,16 @@ export interface RenderOptions {
     deflist?: boolean
     frontMatter?: boolean
     comments?: boolean
+    /** Obsidian inline tags (#tag) */
+    tags?: boolean
+    /** Obsidian embeds (![[note]], ![[image.png|300]]) */
+    embeds?: boolean
+    /** Obsidian block references (^block-id) */
+    blockRefs?: boolean
+    /** Code-block admonitions (~~~ad-note) */
+    admonitions?: boolean
+    /** Front matter properties display (collapsible panel) */
+    frontMatterDisplay?: boolean
   }
 }
 
@@ -159,7 +183,7 @@ const ALLOWED_ATTR = [
   'x1', 'y1', 'x2', 'y2', 'offset', 'stop-color', 'stop-opacity',
   'xmlns', 'version', 'font-size', 'text-anchor', 'dominant-baseline',
   'marker-end', 'marker-start', 'clip-path', 'gradientunits',
-  'opacity', 'filter', 'id', 'points', 'open',
+  'opacity', 'filter', 'id', 'points', 'open', 'loading', 'controls',
 ]
 
 // ─── YAML Front Matter Parser ────────────────────────────────────────────────
@@ -200,6 +224,7 @@ function parseYamlFrontMatter(raw: string): Record<string, unknown> {
 function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
   const features = opts.features ?? {}
   const frontMatterData: { value: Record<string, unknown> | null } = { value: null }
+  const wikilinkBase = opts.wikilinkBase ?? '/'
 
   const md = new MarkdownIt({
     html: true,
@@ -271,23 +296,52 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     md.use(calloutPlugin)
   }
 
+  // ─── Code-block Admonitions (~~~ad-note) ─────────────────────────
+
+  if (features.admonitions !== false) {
+    md.use(admonitionPlugin)
+  }
+
   // ─── Heading IDs ─────────────────────────────────────────────────
 
   if (features.headingIds !== false) {
     md.use(headingIdPlugin)
   }
 
-  // ─── Wikilinks ───────────────────────────────────────────────────
+  // ─── Wikilinks ([[note]], [[note#heading]], [[note|alias]]) ──────
 
   if (features.wikilinks !== false) {
-    const baseUrl = opts.wikilinkBase ?? '/'
     md.use(wikilinks, {
-      baseURL: baseUrl,
+      baseURL: wikilinkBase,
       uriSuffix: '',
       makeAllLinkAbsolute: false,
       linkPattern: /\[\[([^\x00-\x1F|]+?)(\|[^\x00-\x1F|]+?)?\]\]/,
-      generatePageNameFromLabel: (label: string) => label.trim(),
+      generatePageNameFromLabel: (label: string) => {
+        // For [[note#heading]], extract just the page name
+        // but preserve # in the label for href generation
+        return label.trim()
+      },
     })
+  }
+
+  // ─── Obsidian Embeds (![[note]], ![[img.png|300]]) ───────────────
+  // Must be registered AFTER wikilinks so it can detect the pattern
+  // of "!" text token followed by wikilink tokens and transform them.
+
+  if (features.embeds !== false) {
+    md.use(embedPlugin, { wikilinkBase })
+  }
+
+  // ─── Obsidian Tags (#tag, #nested/tag) ───────────────────────────
+
+  if (features.tags !== false) {
+    md.use(tagPlugin)
+  }
+
+  // ─── Obsidian Block References (^block-id) ───────────────────────
+
+  if (features.blockRefs !== false) {
+    md.use(blockRefPlugin)
   }
 
   // ─── Custom Renderers ────────────────────────────────────────────
@@ -305,9 +359,22 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
       tokens[idx].attrSet('target', '_blank')
       tokens[idx].attrSet('rel', 'noopener noreferrer')
     }
-    // Mark wikilinks with a class
-    if (href && href.startsWith(opts.wikilinkBase ?? '/')) {
+    // Mark wikilinks with a class for click handling
+    if (href && href.startsWith(wikilinkBase)) {
       tokens[idx].attrJoin('class', 'wikilink')
+
+      // Enhanced wikilink: add data attributes for heading/block references
+      const hashIdx = href.indexOf('#')
+      if (hashIdx !== -1) {
+        const fragment = href.slice(hashIdx + 1)
+        if (fragment.startsWith('^')) {
+          // Block reference: [[note#^blockid]]
+          tokens[idx].attrSet('data-wikilink-block', fragment.slice(1))
+        } else {
+          // Heading reference: [[note#heading]]
+          tokens[idx].attrSet('data-wikilink-heading', fragment)
+        }
+      }
     }
     return defaultLinkOpen(tokens, idx, options, env, self)
   }
@@ -348,8 +415,15 @@ function sanitizeHtml(html: string): string {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ADD_ATTR: [
-      'data-mermaid-source', 'data-callout', 'data-code', 'data-lang',
-      'data-callout-foldable', 'data-callout-collapsed',
+      'data-mermaid-source',
+      'data-callout', 'data-callout-foldable', 'data-callout-collapsed',
+      'data-admonition',
+      'data-code', 'data-lang',
+      'data-tag',
+      'data-embed-src', 'data-embed-type', 'data-embed-heading', 'data-embed-block',
+      'data-embed-placeholder',
+      'data-block-id',
+      'data-wikilink-heading', 'data-wikilink-block',
     ],
     ADD_TAGS: ['input'],
     // Allow data: URIs for images (base64 uploads)
@@ -385,6 +459,15 @@ export async function renderMarkdown(
   // Step 5: Extract front matter
   const frontMatter = (md as any).__frontMatter?.value ?? null
 
+  // Step 6: Inject front matter properties display
+  const features = opts.features ?? {}
+  if (features.frontMatterDisplay !== false && frontMatter) {
+    const fmHtml = renderFrontMatterDisplay(frontMatter)
+    if (fmHtml) {
+      html = fmHtml + html
+    }
+  }
+
   return { html, headings, frontMatter }
 }
 
@@ -405,6 +488,15 @@ export function renderMarkdownSync(
 
   const headings = extractHeadings(html)
   const frontMatter = (md as any).__frontMatter?.value ?? null
+
+  // Inject front matter properties display
+  const features = opts.features ?? {}
+  if (features.frontMatterDisplay !== false && frontMatter) {
+    const fmHtml = renderFrontMatterDisplay(frontMatter)
+    if (fmHtml) {
+      html = fmHtml + html
+    }
+  }
 
   return { html, headings, frontMatter }
 }

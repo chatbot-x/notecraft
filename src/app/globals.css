@@ -959,6 +959,319 @@
   margin-top: -0.25em;
 }
 
+/* ─── Obsidian Tags (#tag) ─────────────────────────────────────────────── */
+
+.markdown-preview a.obsidian-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1em 0.5em;
+  border-radius: 1em;
+  font-size: 0.85em;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: oklch(0.5 0.15 280);
+  background: oklch(0.95 0.03 280);
+  border: 1px solid oklch(0.85 0.05 280);
+}
+
+.markdown-preview a.obsidian-tag:hover {
+  background: oklch(0.9 0.06 280);
+  color: oklch(0.4 0.18 280);
+  border-color: oklch(0.7 0.1 280);
+}
+
+.dark .markdown-preview a.obsidian-tag {
+  color: oklch(0.7 0.15 280);
+  background: oklch(0.2 0.04 280);
+  border-color: oklch(0.35 0.06 280);
+}
+
+.dark .markdown-preview a.obsidian-tag:hover {
+  background: oklch(0.25 0.08 280);
+  color: oklch(0.8 0.18 280);
+  border-color: oklch(0.45 0.1 280);
+}
+
+/* ─── Obsidian Embeds (![[note]], ![[image.png]]) ─────────────────────── */
+
+.markdown-preview .embed-note {
+  margin: 1em 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: oklch(0.97 0 0);
+  transition: border-color 0.15s;
+}
+
+.dark .markdown-preview .embed-note {
+  background: oklch(0.18 0 0);
+}
+
+.markdown-preview .embed-note:hover {
+  border-color: oklch(0.55 0.15 250);
+}
+
+.markdown-preview .embed-note-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.5em 0.75em;
+  background: oklch(0.94 0 0);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.dark .markdown-preview .embed-note-header {
+  background: oklch(0.22 0 0);
+}
+
+.markdown-preview .embed-note-icon {
+  font-size: 0.9em;
+  opacity: 0.6;
+}
+
+.markdown-preview .embed-note-title {
+  font-weight: 500;
+  color: oklch(0.5 0.15 250);
+}
+
+.dark .markdown-preview .embed-note-title {
+  color: oklch(0.7 0.15 250);
+}
+
+.markdown-preview .embed-note-content {
+  padding: 0.75em 1em;
+  font-size: 0.95em;
+  line-height: 1.6;
+}
+
+.markdown-preview .embed-note-content em {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.markdown-preview img.embed-image {
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  margin: 1em 0;
+  transition: border-color 0.15s;
+}
+
+.markdown-preview img.embed-image:hover {
+  border-color: oklch(0.55 0.15 250);
+}
+
+.markdown-preview audio.embed-audio {
+  width: 100%;
+  margin: 1em 0;
+  border-radius: 8px;
+}
+
+.markdown-preview video.embed-video {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 1em 0;
+}
+
+/* ─── Obsidian Block References (^block-id) ───────────────────────────── */
+
+.markdown-preview [data-block-id] {
+  position: relative;
+}
+
+.markdown-preview .block-ref-id {
+  display: inline;
+  font-size: 0.75em;
+  color: var(--muted-foreground);
+  opacity: 0.4;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.15s;
+}
+
+.markdown-preview .block-ref-id:hover {
+  opacity: 0.8;
+  color: oklch(0.55 0.15 250);
+}
+
+/* ─── Frontmatter Properties Display ──────────────────────────────────── */
+
+.markdown-preview .frontmatter-display {
+  margin-bottom: 1.5em;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.9em;
+  background: oklch(0.97 0 0);
+}
+
+.dark .markdown-preview .frontmatter-display {
+  background: oklch(0.18 0 0);
+}
+
+.markdown-preview .frontmatter-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.5em 0.75em;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9em;
+  color: var(--muted-foreground);
+  transition: color 0.15s;
+  list-style: none;
+}
+
+.markdown-preview .frontmatter-summary::-webkit-details-marker {
+  display: none;
+}
+
+.markdown-preview .frontmatter-summary:hover {
+  color: var(--foreground);
+}
+
+.markdown-preview .frontmatter-summary::before {
+  content: "\u25B8";
+  font-size: 0.7em;
+  transition: transform 0.15s;
+}
+
+.markdown-preview .frontmatter-display[open] > .frontmatter-summary::before {
+  transform: rotate(90deg);
+}
+
+.markdown-preview .frontmatter-summary-icon {
+  font-size: 0.9em;
+}
+
+.markdown-preview .frontmatter-count {
+  margin-left: auto;
+  background: oklch(0.9 0 0);
+  color: var(--muted-foreground);
+  padding: 0.1em 0.5em;
+  border-radius: 1em;
+  font-size: 0.8em;
+}
+
+.dark .markdown-preview .frontmatter-count {
+  background: oklch(0.3 0 0);
+}
+
+.markdown-preview .frontmatter-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 1px solid var(--border);
+}
+
+.markdown-preview .frontmatter-table td {
+  padding: 0.35em 0.75em;
+  border-bottom: 1px solid oklch(0.92 0 0);
+  vertical-align: top;
+}
+
+.dark .markdown-preview .frontmatter-table td {
+  border-bottom-color: oklch(0.25 0 0);
+}
+
+.markdown-preview .frontmatter-table tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-preview .frontmatter-key {
+  font-weight: 600;
+  color: oklch(0.5 0.1 280);
+  white-space: nowrap;
+  width: 1%;
+  font-size: 0.85em;
+}
+
+.dark .markdown-preview .frontmatter-key {
+  color: oklch(0.7 0.1 280);
+}
+
+.markdown-preview .frontmatter-value {
+  color: var(--foreground);
+  font-size: 0.85em;
+}
+
+.markdown-preview .frontmatter-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1em 0.4em;
+  margin: 0.1em;
+  border-radius: 0.5em;
+  background: oklch(0.93 0.03 280);
+  color: oklch(0.5 0.15 280);
+  font-size: 0.9em;
+}
+
+.dark .markdown-preview .frontmatter-tag {
+  background: oklch(0.25 0.04 280);
+  color: oklch(0.7 0.15 280);
+}
+
+.markdown-preview .frontmatter-boolean {
+  color: oklch(0.55 0.18 145);
+  font-weight: 600;
+}
+
+.markdown-preview .frontmatter-number {
+  color: oklch(0.55 0.15 45);
+  font-weight: 500;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.markdown-preview .frontmatter-date {
+  color: oklch(0.5 0.12 250);
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.markdown-preview .frontmatter-null {
+  color: var(--muted-foreground);
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.markdown-preview .frontmatter-empty {
+  color: var(--muted-foreground);
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.markdown-preview .frontmatter-array {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.15em;
+}
+
+/* ─── Code-block Admonitions (~~~ad-note) ────────────────────────────── */
+
+.markdown-preview .admonition-code {
+  border-left-width: 4px;
+}
+
+.markdown-preview .admonition-code .callout-content pre {
+  margin: 0;
+  padding: 0.75em;
+  background: oklch(0.97 0 0) !important;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.9em;
+}
+
+.dark .markdown-preview .admonition-code .callout-content pre {
+  background: oklch(0.15 0 0) !important;
+}
+
+.markdown-preview .admonition-code .callout-content code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+}
+
 /* ─── Medium Zoom ───────────────────────────────────────────────────────── */
 
 .medium-zoom-overlay {
