@@ -33,11 +33,56 @@ import {
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { lintKeymap } from '@codemirror/lint'
 import { useNotesStore } from '@/lib/store'
-import { toolbarPlugin, slashCommands, editorExtTheme } from '@/lib/codemirror-ext'
+import {
+  toolbarPlugin, slashCommands, editorExtTheme,
+  imageUpload, createImageUploadCommand,
+  finalNewline,
+} from '@/lib/codemirror-ext'
 import { Toolbar } from '@/lib/codemirror-ext'
+
+// Separate packages
+import { markdownTables, markdownTableAutocompleter, TableTheme, insertEmptyMarkdownTable } from 'codemirror-markdown-tables'
+import { mermaid } from 'codemirror-lang-mermaid'
 
 const themeCompartment = new Compartment()
 const fontSizeCompartment = new Compartment()
+
+// ─── Image Upload Handler ──────────────────────────────────────────────────────
+
+/**
+ * Default image upload handler.
+ * Converts the file to a data URL for local-only storage.
+ * Replace this with your own upload logic for server-based storage.
+ */
+function handleImageUpload({ file, callback }: { id: string; file: File; callback: { progress: (n: number) => void; fail: (e: Error) => void; success: (u: string) => void } }) {
+  const reader = new FileReader()
+
+  reader.onprogress = (e) => {
+    if (e.lengthComputable) {
+      callback.progress(Math.round((e.loaded / e.total) * 100))
+    }
+  }
+
+  reader.onload = () => {
+    callback.success(reader.result as string)
+  }
+
+  reader.onerror = () => {
+    callback.fail(new Error('Failed to read file'))
+  }
+
+  reader.readAsDataURL(file)
+}
+
+// ─── Image upload command for toolbar ──────────────────────────────────────────
+
+const imageUploadCommand = createImageUploadCommand({
+  action: handleImageUpload,
+  enableDrop: true,
+  enablePaste: true,
+})
+
+// ─── Editor Component ──────────────────────────────────────────────────────────
 
 interface CodeMirrorEditorProps {
   initialValue: string
@@ -56,6 +101,9 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
   const [editorView, setEditorView] = useState<EditorView | null>(null)
 
   const getExtensions = useCallback((): Extension[] => {
+    // Markdown language with GFM support
+    const mdLang = markdown({ base: markdownLanguage })
+
     return [
       lineNumbers(),
       highlightActiveLineGutter(),
@@ -84,11 +132,30 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
         ...lintKeymap,
         indentWithTab,
       ]),
-      markdown({ base: markdownLanguage }),
+      // Markdown language
+      mdLang,
+      // Mermaid syntax highlighting (separate package)
+      mermaid(),
+      // Interactive Markdown tables (separate package)
+      markdownTables({
+        theme: {
+          light: TableTheme.githubLight,
+          dark: TableTheme.githubDark,
+        },
+      }),
+      mdLang.language.data.of({ autocomplete: markdownTableAutocompleter() }),
       // Toolbar plugin (creates container for React portal)
       toolbarPlugin,
       // Theme for toolbar + slash command styling
       editorExtTheme,
+      // Image upload with drag-drop and paste support
+      imageUpload({
+        action: handleImageUpload,
+        enableDrop: true,
+        enablePaste: true,
+      }),
+      // Final newline (ensures doc ends with newline on focus change)
+      finalNewline({ enabled: true, onFocusOnly: true }),
       themeCompartment.of(isDark ? oneDark : []),
       fontSizeCompartment.of(EditorView.theme({
         '&': { fontSize: `${fontSize}px` },

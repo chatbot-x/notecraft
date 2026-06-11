@@ -13,8 +13,8 @@ import {
   Bold, Italic, Strikethrough, Code, Underline, Highlighter,
   Heading1, Heading2, Heading3, Heading4,
   List, ListOrdered, CheckSquare,
-  Quote, Link, Image, Table, FileCode,
-  SeparatorHorizontal,
+  Quote, Link, ImagePlus, Table, FileCode,
+  SeparatorHorizontal, Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ToolbarItemConfig, ToolbarItem } from './types'
@@ -25,6 +25,24 @@ import {
   blockquote, unorderedList, orderedList, todoList,
   link, image, codeBlock, horizontalRule, table,
 } from '../commands'
+import { createImageUploadCommand } from '../image'
+
+// ─── Image upload command factory ──────────────────────────────────────────────
+
+/** Default image upload handler — converts to data URL for local storage */
+function defaultImageUploadHandler({ file, callback }: { id: string; file: File; callback: { progress: (n: number) => void; fail: (e: Error) => void; success: (u: string) => void } }) {
+  const reader = new FileReader()
+  reader.onprogress = (e) => { if (e.lengthComputable) callback.progress(Math.round((e.loaded / e.total) * 100)) }
+  reader.onload = () => callback.success(reader.result as string)
+  reader.onerror = () => callback.fail(new Error('Failed to read file'))
+  reader.readAsDataURL(file)
+}
+
+const imageUploadCommand = createImageUploadCommand({
+  action: defaultImageUploadHandler,
+  enableDrop: true,
+  enablePaste: true,
+})
 
 // ─── UI Primitives ────────────────────────────────────────────────────────────
 
@@ -55,7 +73,8 @@ export const defaultToolbarItems: ToolbarItemConfig[] = [
   { key: 'todo', label: 'To-Do List', icon: <CheckSquare className="h-3.5 w-3.5" />, command: todoList },
   { type: 'separator' },
   { key: 'link', label: 'Insert Link', icon: <Link className="h-3.5 w-3.5" />, command: link },
-  { key: 'image', label: 'Insert Image', icon: <Image className="h-3.5 w-3.5" />, command: image },
+  { key: 'image', label: 'Insert Image', icon: <ImagePlus className="h-3.5 w-3.5" />, command: image },
+  { key: 'upload', label: 'Upload Image', icon: <Upload className="h-3.5 w-3.5" />, command: imageUploadCommand, shortcut: 'Ctrl+Shift+I' },
   { key: 'codeblock', label: 'Code Block', icon: <FileCode className="h-3.5 w-3.5" />, command: codeBlock },
   { key: 'table', label: 'Insert Table', icon: <Table className="h-3.5 w-3.5" />, command: table },
   { key: 'hr', label: 'Horizontal Rule', icon: <SeparatorHorizontal className="h-3.5 w-3.5" />, command: horizontalRule },

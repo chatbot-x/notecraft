@@ -22,6 +22,8 @@ import {
   blockquote, unorderedList, orderedList, todoList,
   link, image, codeBlock, horizontalRule, table,
 } from '../commands'
+import { createImageUploadCommand } from '../image'
+import { copyHeadingSlug, setHeadingSlug } from '../slug'
 
 // ─── Slash Command Definitions ─────────────────────────────────────────────────
 
@@ -39,6 +41,21 @@ export interface SlashCommandOption {
 }
 
 // ─── Helper: Create a slash command that runs a CM6 Command ────────────────────
+
+// Default image upload handler for slash command
+function defaultImageUploadHandler({ file, callback }: { id: string; file: File; callback: { progress: (n: number) => void; fail: (e: Error) => void; success: (u: string) => void } }) {
+  const reader = new FileReader()
+  reader.onprogress = (e) => { if (e.lengthComputable) callback.progress(Math.round((e.loaded / e.total) * 100)) }
+  reader.onload = () => callback.success(reader.result as string)
+  reader.onerror = () => callback.fail(new Error('Failed to read file'))
+  reader.readAsDataURL(file)
+}
+
+const slashImageUploadCommand = createImageUploadCommand({
+  action: defaultImageUploadHandler,
+  enableDrop: true,
+  enablePaste: true,
+})
 
 function commandApply(command: Command): (view: EditorView, completion: Completion, from: number, to: number) => void {
   return (view, _completion, from, to) => {
@@ -83,7 +100,12 @@ function buildSlashCommands(): SlashCommandOption[] {
     // Inserts
     { label: 'Link', detail: 'Insert', keywords: ['link', 'url', 'href'], apply: commandApply(link) },
     { label: 'Image', detail: 'Insert', keywords: ['image', 'img', 'photo', 'picture'], apply: commandApply(image) },
+    { label: 'Upload Image', detail: 'Insert', boost: 3, keywords: ['upload', 'image', 'photo', 'file', 'attach'], apply: commandApply(slashImageUploadCommand) },
     { label: 'Table', detail: 'Insert', keywords: ['table', 'grid'], apply: commandApply(table) },
+
+    // Slug
+    { label: 'Copy Heading Link', detail: 'Slug', keywords: ['slug', 'anchor', 'id', 'heading', 'link', 'copy'], apply: commandApply(copyHeadingSlug) },
+    { label: 'Set Heading ID', detail: 'Slug', keywords: ['slug', 'anchor', 'id', 'heading', 'set'], apply: commandApply(setHeadingSlug) },
   ]
 }
 

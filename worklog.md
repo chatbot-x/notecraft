@@ -1,25 +1,29 @@
+# NoteCraft Worklog
+
 ---
 Task ID: 1
-Agent: Super Z (main)
-Task: Create custom all-in-one CodeMirror 6 extension package (codemirror-ext) based on yeliex packages
+Agent: Main Agent
+Task: Expand codemirror-ext with absorbed plugins and separate packages
 
 Work Log:
-- Examined yeliex/codemirror-toolbar source: ViewPlugin-based DOM toolbar with static HTML buttons
-- Examined yeliex/codemirror-markdown-commands source: bold, italic, strike, underline, heading, list, quote, link, image commands
-- Designed codemirror-ext package structure: commands/, toolbar/, slash/, theme/
-- Implemented enhanced markdown commands with toggle support (wrap/unwrap), smart cursor placement
-- Added new commands not in yeliex: inlineCode, highlight, codeBlock, horizontalRule, table
-- Built React-based toolbar using createPortal into CM6's toolbar container (much richer UI than yeliex's DOM-only approach)
-- Built Notion-style slash commands using @codemirror/autocomplete with 19 categorized options
-- Created theme extension for toolbar and autocomplete styling
-- Integrated all extensions into the NoteCraft editor component
-- Fixed TypeScript errors: Completion.apply signature, Highlighter import, unused refs
-- Enhanced globals.css with autocomplete dropdown styling for slash commands
-- Verified toolbar renders correctly with all 19 buttons in browser
+- Researched 8+ CodeMirror extension packages across npm and GitHub
+- Audited full yeliex/codemirror-extensions monorepo (9 packages)
+- Identified which packages to absorb vs use separately
+- Installed separate npm packages: codemirror-markdown-tables, codemirror-lang-mermaid, github-slugger, @codemirror/lint
+- Created 4 new modules inside codemirror-ext:
+  - image/ - Image upload with progress, drag-drop, paste support, status linter
+  - inline-suggestion/ - GitHub Copilot-style ghost text AI suggestions with Tab accept
+  - slug/ - Heading slug utilities (copy, set, remove, jump) — editing only, no rendering
+  - final-newline/ - Configurable trailing newline enforcement
+- Updated index.ts with all new exports and types
+- Updated editor.tsx to integrate all extensions (imageUpload, markdownTables, mermaid, finalNewline)
+- Updated toolbar with Upload Image button (Upload icon) and renamed Image to ImagePlus
+- Updated slash commands with Upload Image, Copy Heading Link, Set Heading ID options
+- Fixed TypeScript errors: Extension import from @codemirror/state, Prec import, Range type
+- Build passes successfully
 
 Stage Summary:
-- Created /src/lib/codemirror-ext/ package with 4 modules: commands, toolbar, slash, theme
-- Commands: 17 markdown editing commands (6 inline, 4 heading, 4 list, 3 block, 4 insert)
-- Toolbar: 19 buttons with Lucide icons, tooltips, and keyboard shortcut hints
-- Slash commands: 19 options across 4 categories (Text, Heading, List, Insert) triggered by `/`
-- All TypeScript clean, no runtime errors, toolbar verified in browser
+- codemirror-ext now has 8 modules: commands, toolbar, slash, theme, image, inline-suggestion, slug, final-newline
+- 2 separate npm packages used: codemirror-markdown-tables, codemirror-lang-mermaid
+- No rendering engine added — all modules are editing tools only
+- Build compiles successfully with Next.js 16.1.3

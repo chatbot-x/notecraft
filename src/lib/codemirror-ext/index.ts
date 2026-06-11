@@ -4,18 +4,16 @@
  * Combines and improves upon:
  * - codemirror-toolbar (yeliex) → Custom React toolbar with Lucide icons
  * - codemirror-markdown-commands (yeliex) → Enhanced toggle-aware markdown commands
+ * - codemirror-markdown-image (yeliex) → Image upload with progress, drag-drop, paste
+ * - codemirror-companion-extension (rizerphe) → Stabilized inline AI suggestions
+ * - codemirror-final-newline (yeliex) → Configurable trailing newline
  * - NEW: Slash commands via @codemirror/autocomplete
+ * - NEW: Heading slug utilities (custom, no rendering)
  *
  * Usage:
  * ```ts
- * import { toolbarPlugin, slashCommands, editorExtTheme } from '@/lib/codemirror-ext'
- * import { bold, italic, h1 } from '@/lib/codemirror-ext/commands'
- *
- * const extensions = [
- *   toolbarPlugin,
- *   slashCommands(),
- *   editorExtTheme,
- * ]
+ * import { toolbarPlugin, slashCommands, editorExtTheme, imageUpload, inlineSuggestion, finalNewline } from '@/lib/codemirror-ext'
+ * import { bold, italic, h1 } from '@/lib/codemirror-ext'
  * ```
  */
 
@@ -44,3 +42,22 @@ export type { SlashCommandOption } from './slash'
 
 // Theme
 export { editorExtTheme } from './theme'
+
+// Image upload
+export { imageUpload, createImageUploadCommand, imageStatusLinter } from './image'
+export type { ImageUploadOptions, UploadCallback, UploadActionParams } from './image'
+
+// Inline suggestion
+export { inlineSuggestion, forceableInlineSuggestion } from './inline-suggestion'
+export type { InlineSuggestionOptions, Suggestion, ForceableInlineSuggestionResult } from './inline-suggestion'
+
+// Slug utilities
+export {
+  copyHeadingSlug, setHeadingSlug, removeHeadingSlug, jumpToHeading,
+  generateSlug, generateSlugWithSlugger, parseHeading, scanDocumentHeadings,
+  getCurrentHeadingSlug,
+} from './slug'
+
+// Final newline
+export { finalNewline } from './final-newline'
+export type { FinalNewlineOptions } from './final-newline'
