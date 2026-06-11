@@ -53,7 +53,12 @@ function getNoteTitle(content: string): string {
 
 export const WELCOME_NOTE_ID = '__welcome__'
 
-export const WELCOME_CONTENT = `# Welcome to NoteCraft
+export const WELCOME_CONTENT = `---
+title: Welcome to NoteCraft
+tags: [welcome, demo, obsidian]
+---
+
+# Welcome to NoteCraft
 
 Your Obsidian-level markdown note-taking app, powered by **CodeMirror 6** and **markdown-it**.
 
@@ -75,6 +80,7 @@ Your Obsidian-level markdown note-taking app, powered by **CodeMirror 6** and **
 - Task lists with interactive checkboxes
 - Footnotes[^1]
 - Custom attributes {.text-red}
+- Emoji shortcuts :rocket: :fire: :star:
 
 ## Code Blocks
 
@@ -88,7 +94,7 @@ interface NoteCraft {
 const app: NoteCraft = {
   editor: "CodeMirror 6",
   renderer: "markdown-it",
-  features: ["wikilinks", "callouts", "math", "mermaid", "katex"]
+  features: ["wikilinks", "callouts", "math", "mermaid", "katex", "emoji"]
 }
 \`\`\`
 
@@ -126,17 +132,33 @@ graph LR
 > [!tip] Tip
 > Try using \`Ctrl + Shift + F\` to format your Markdown with Prettier!
 
-> [!warning] Warning
-> Make sure to back up your notes regularly.
+> [!warning]+ Expandable Warning
+> This callout starts expanded. Click the title to collapse it.
+
+> [!tip]- Collapsed Tip
+> This callout starts collapsed. Click the title to expand it.
 
 > [!danger] Danger
 > Clearing browser data will delete all your notes!
+
+## Definition Lists
+
+Markdown
+: A lightweight markup language created by John Gruber
+
+CodeMirror 6
+: A versatile text editor implemented in JavaScript for the browser
+
+## Comments
+
+This text is visible. %%This text is hidden in the preview%% And this is also visible.
 
 ## Task Lists
 
 - [x] Set up CodeMirror 6 editor
 - [x] Build custom extension plugin
 - [x] Implement markdown-it rendering engine
+- [x] Add emoji, definition lists, front matter, foldable callouts
 - [ ] Add scroll sync between editor and preview
 - [ ] Add note search within content
 
@@ -149,6 +171,11 @@ graph LR
 | Diagrams | Mermaid | Active |
 | Callouts | Custom Plugin | Active |
 | Wikilinks | markdown-it-wikilinks | Active |
+| Emoji | markdown-it-emoji | Active |
+| Def Lists | markdown-it-deflist | Active |
+| Front Matter | markdown-it-front-matter | Active |
+| Comments | Custom Plugin | Active |
+| Foldable Callouts | Custom Plugin | Active |
 
 ---
 

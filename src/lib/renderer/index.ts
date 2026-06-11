@@ -1,18 +1,28 @@
 /**
  * NoteCraft Rendering Engine — markdown-it + plugin pipeline
  *
- * Industrial-grade Markdown rendering with:
+ * Industrial-grade Markdown rendering with 18 plugins:
  * - GFM (tables, strikethrough, task lists, autolinks)
  * - KaTeX math ($...$ and $$...$$)
  * - Mermaid diagrams (lazy-loaded)
- * - Obsidian-style callouts (> [!note], > [!warning], etc.)
+ * - Obsidian-style callouts (> [!note], > [!warning]+, > [!danger]-)
+ *   with foldable support, type aliases, and data attributes
  * - Wikilinks ([[note name]])
  * - Footnotes ([^1])
  * - Heading anchors with auto-generated IDs
  * - Subscript, superscript, highlighted text
  * - Custom attributes ({.class #id})
+ * - Emoji shortcuts (:rocket: → 🚀)
+ * - Definition lists (Term / : Definition)
+ * - YAML front matter (--- title: ... ---)
+ * - Obsidian comments (%%hidden%%)
  * - XSS-safe output via DOMPurify
  * - Syntax highlighting via Shiki (async post-processing)
+ *
+ * Architecture principle:
+ *   markdown-it is the engine, remark is the reference implementation.
+ *   We study how remark plugins handle edge cases, then implement the
+ *   same logic in markdown-it's token stream model.
  *
  * Usage:
  * ```ts
@@ -35,22 +45,28 @@ import sub from 'markdown-it-sub'
 import sup from 'markdown-it-sup'
 import mark from 'markdown-it-mark'
 import attrs from 'markdown-it-attrs'
+import { full as emojiFull } from 'markdown-it-emoji'
+import deflist from 'markdown-it-deflist'
+// @ts-expect-error — CJS module with no default export
+import frontMatter from 'markdown-it-front-matter'
+
 // DOMPurify — browser-only sanitization.
 // Since the preview component is client-only (ssr: false), DOMPurify is
 // only ever invoked in the browser. We use a lazy init pattern to avoid
 // requiring jsdom on the server (which breaks Cloudflare Workers).
-let _dompurify: typeof import('dompurify').default | null = null
+let _dompurify: any = null
 
 function getPurify() {
   if (!_dompurify) {
-    // DOMPurify requires a `window` object — only available in the browser.
-    // The isomorphic version pulls in jsdom which doesn't work on edge runtimes.
     _dompurify = require('dompurify')
   }
   return _dompurify
 }
+
+// Custom plugins (backported from remark ecosystem / built from scratch)
 import mermaidPlugin from './mermaid-plugin'
 import calloutPlugin from './callout-plugin'
+import commentPlugin from './comment-plugin'
 import headingIdPlugin from './heading-id-plugin'
 import { highlightAllCodeBlocks } from './code-highlighter'
 
@@ -63,6 +79,8 @@ export interface RenderOptions {
   wikilinkBase?: string
   /** Called when a wikilink is clicked in the preview. Receives the page name. */
   onWikilinkClick?: (pageName: string) => void
+  /** Parsed front matter data (if YAML header exists) */
+  frontMatter?: Record<string, unknown>
   /** Enable/disable specific features */
   features?: {
     math?: boolean
@@ -76,6 +94,10 @@ export interface RenderOptions {
     sub?: boolean
     sup?: boolean
     mark?: boolean
+    emoji?: boolean
+    deflist?: boolean
+    frontMatter?: boolean
+    comments?: boolean
   }
 }
 
@@ -84,6 +106,8 @@ export interface RenderResult {
   html: string
   /** Extracted heading list for TOC generation */
   headings: Array<{ id: string; text: string; level: number }>
+  /** Parsed YAML front matter (if present) */
+  frontMatter: Record<string, unknown> | null
 }
 
 // ─── DOMPurify Configuration ──────────────────────────────────────────────────
@@ -136,13 +160,47 @@ const ALLOWED_ATTR = [
   'x1', 'y1', 'x2', 'y2', 'offset', 'stop-color', 'stop-opacity',
   'xmlns', 'version', 'font-size', 'text-anchor', 'dominant-baseline',
   'marker-end', 'marker-start', 'clip-path', 'gradientunits',
-  'opacity', 'filter', 'id', 'points',
+  'opacity', 'filter', 'id', 'points', 'open',
 ]
+
+// ─── YAML Front Matter Parser ────────────────────────────────────────────────
+
+function parseYamlFrontMatter(raw: string): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  const lines = raw.split('\n')
+
+  for (const line of lines) {
+    const colonIdx = line.indexOf(':')
+    if (colonIdx === -1) continue
+
+    const key = line.slice(0, colonIdx).trim()
+    let value: unknown = line.slice(colonIdx + 1).trim()
+
+    if (!key || value === '') continue
+
+    // Parse arrays: [item1, item2, item3]
+    if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+      value = value.slice(1, -1).split(',').map((s: string) => s.trim()).filter(Boolean)
+    }
+    // Parse booleans
+    else if (value === 'true') value = true
+    else if (value === 'false') value = false
+    // Parse numbers
+    else if (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value)) {
+      value = parseFloat(value)
+    }
+
+    result[key] = value
+  }
+
+  return result
+}
 
 // ─── Markdown-it Instance Factory ─────────────────────────────────────────────
 
 function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
   const features = opts.features ?? {}
+  const frontMatterData: { value: Record<string, unknown> | null } = { value: null }
 
   const md = new MarkdownIt({
     html: true,
@@ -152,7 +210,15 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     typographer: true,
   })
 
-  // ─── Core Plugins ─────────────────────────────────────────────────────
+  // ─── Front Matter (must be first — strips YAML header) ────────────
+
+  if (features.frontMatter !== false) {
+    md.use(frontMatter, (raw: string) => {
+      frontMatterData.value = parseYamlFrontMatter(raw)
+    })
+  }
+
+  // ─── Core Plugins ─────────────────────────────────────────────────
 
   // GFM features (task lists with checkboxes)
   if (features.taskLists !== false) {
@@ -164,14 +230,28 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     md.use(footnote)
   }
 
-  // ─── Formatting Extensions ────────────────────────────────────────────
+  // ─── Formatting Extensions ────────────────────────────────────────
 
   if (features.sub !== false) md.use(sub)       // H~2~O
   if (features.sup !== false) md.use(sup)       // E=mc^2^
   if (features.mark !== false) md.use(mark)     // ==highlighted==
   if (features.attrs !== false) md.use(attrs)   // {.class #id}
 
-  // ─── Math (KaTeX) ────────────────────────────────────────────────────
+  // ─── Emoji (:rocket: → 🚀) ────────────────────────────────────────
+
+  if (features.emoji !== false) md.use(emojiFull)
+
+  // ─── Definition Lists ─────────────────────────────────────────────
+
+  if (features.deflist !== false) md.use(deflist)
+
+  // ─── Obsidian Comments (%%hidden%%) ───────────────────────────────
+
+  if (features.comments !== false) {
+    md.use(commentPlugin, { strip: true })
+  }
+
+  // ─── Math (KaTeX) ────────────────────────────────────────────────
 
   if (features.math !== false) {
     md.use(katex, {
@@ -180,25 +260,25 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     })
   }
 
-  // ─── Mermaid Diagrams ────────────────────────────────────────────────
+  // ─── Mermaid Diagrams ────────────────────────────────────────────
 
   if (features.mermaid !== false) {
     md.use(mermaidPlugin)
   }
 
-  // ─── Obsidian-style Callouts ─────────────────────────────────────────
+  // ─── Obsidian-style Callouts ─────────────────────────────────────
 
   if (features.callouts !== false) {
     md.use(calloutPlugin)
   }
 
-  // ─── Heading IDs ─────────────────────────────────────────────────────
+  // ─── Heading IDs ─────────────────────────────────────────────────
 
   if (features.headingIds !== false) {
     md.use(headingIdPlugin)
   }
 
-  // ─── Wikilinks ───────────────────────────────────────────────────────
+  // ─── Wikilinks ───────────────────────────────────────────────────
 
   if (features.wikilinks !== false) {
     const baseUrl = opts.wikilinkBase ?? '/'
@@ -211,7 +291,7 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     })
   }
 
-  // ─── Custom Renderers ────────────────────────────────────────────────
+  // ─── Custom Renderers ────────────────────────────────────────────
 
   // Make wikilinks use a special class for click handling
   const defaultLinkOpen = md.renderer.rules.link_open ||
@@ -235,9 +315,11 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
 
   // Task list checkbox styling
   md.renderer.rules.bullet_list_open = function (tokens, idx, options, env, self) {
-    // Check if parent has task list items
     return self.renderToken(tokens, idx, options)
   }
+
+  // Store front matter on the instance for retrieval after render
+  ;(md as any).__frontMatter = frontMatterData
 
   return md
 }
@@ -262,11 +344,14 @@ function extractHeadings(html: string): Array<{ id: string; text: string; level:
 // ─── Sanitize HTML ────────────────────────────────────────────────────────────
 
 function sanitizeHtml(html: string): string {
-  const DOMPurify = getPurify()
-  return DOMPurify.sanitize(html, {
+  const purify = getPurify()
+  return purify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
-    ADD_ATTR: ['data-mermaid-source', 'data-callout', 'data-code', 'data-lang'],
+    ADD_ATTR: [
+      'data-mermaid-source', 'data-callout', 'data-code', 'data-lang',
+      'data-callout-foldable', 'data-callout-collapsed',
+    ],
     ADD_TAGS: ['input'],
     // Allow data: URIs for images (base64 uploads)
     ADD_DATA_URI_TAGS: ['img'],
@@ -298,7 +383,10 @@ export async function renderMarkdown(
   // Step 4: Extract headings for TOC
   const headings = extractHeadings(html)
 
-  return { html, headings }
+  // Step 5: Extract front matter
+  const frontMatter = (md as any).__frontMatter?.value ?? null
+
+  return { html, headings, frontMatter }
 }
 
 /**
@@ -317,8 +405,9 @@ export function renderMarkdownSync(
   html = sanitizeHtml(html)
 
   const headings = extractHeadings(html)
+  const frontMatter = (md as any).__frontMatter?.value ?? null
 
-  return { html, headings }
+  return { html, headings, frontMatter }
 }
 
 /**

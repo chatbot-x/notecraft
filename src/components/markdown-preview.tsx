@@ -29,7 +29,7 @@ export function MarkdownPreview({
   onHeadingClick,
 }: MarkdownPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [renderResult, setRenderResult] = useState<RenderResult>({ html: '', headings: [] })
+  const [renderResult, setRenderResult] = useState<RenderResult>({ html: '', headings: [], frontMatter: null })
   const [isRendering, setIsRendering] = useState(false)
   const zoomRef = useRef<Zoom | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -38,7 +38,7 @@ export function MarkdownPreview({
 
   const renderContent = useCallback(async () => {
     if (!content.trim()) {
-      setRenderResult({ html: '', headings: [] })
+      setRenderResult({ html: '', headings: [], frontMatter: null })
       return
     }
 

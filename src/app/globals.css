@@ -899,6 +899,30 @@
 }
 .markdown-preview .callout-important .callout-icon { color: oklch(0.6 0.2 25); }
 
+/* Foldable callouts (<details>/<summary>) */
+.markdown-preview .callout[data-callout-foldable] .callout-title {
+  cursor: pointer;
+  user-select: none;
+}
+.markdown-preview .callout[data-callout-foldable] .callout-title:hover {
+  opacity: 0.85;
+}
+.markdown-preview .callout-fold-icon {
+  margin-left: auto;
+  font-size: 0.75em;
+  opacity: 0.6;
+  transition: transform 0.15s ease;
+}
+.markdown-preview details.callout[open] .callout-fold-icon {
+  transform: rotate(0deg);
+}
+.markdown-preview details.callout:not([open]) .callout-fold-icon {
+  transform: rotate(-90deg);
+}
+.markdown-preview .callout[data-callout-foldable] > .callout-content {
+  padding-top: 0.25em;
+}
+
 /* Dark mode callout overrides */
 .dark .markdown-preview .callout-note { background: oklch(0.2 0.03 250); }
 .dark .markdown-preview .callout-info { background: oklch(0.2 0.03 210); }
@@ -914,6 +938,26 @@
 .dark .markdown-preview .callout-abstract { background: oklch(0.2 0.03 200); }
 .dark .markdown-preview .callout-todo { background: oklch(0.2 0.02 250); }
 .dark .markdown-preview .callout-important { background: oklch(0.22 0.05 25); }
+
+/* ─── Definition Lists ──────────────────────────────────────────────────── */
+
+.markdown-preview dl {
+  margin: 1em 0;
+  padding: 0;
+}
+.markdown-preview dt {
+  font-weight: 600;
+  margin-top: 0.75em;
+  color: var(--foreground);
+}
+.markdown-preview dd {
+  margin: 0.25em 0 0.5em 1.5em;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+.markdown-preview dd + dd {
+  margin-top: -0.25em;
+}
 
 /* ─── Medium Zoom ───────────────────────────────────────────────────────── */
 
