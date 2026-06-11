@@ -1,20 +1,22 @@
 /**
  * Atomic ranges for hybrid rendering.
  *
- * Registers decorated ranges (wikilinks, tags, images, etc.) as atomic ranges
- * so the cursor treats them as single units — jumping over them instead of
- * entering the middle of the decorated content.
+ * This is a FALLBACK atomic ranges extension. Most decoration plugins now
+ * provide their own atomic ranges via the `provide` pattern on their
+ * ViewPlugin definition (e.g., wikilinksPlugin, tagsPlugin, linksPlugin).
  *
- * This is a key part of the Obsidian Live Preview feel: you can click on a
- * wikilink to navigate, but the cursor won't land inside the [[...]] syntax.
+ * This extension handles any remaining decoration types that need atomic
+ * ranges but don't self-provide (e.g., embed transclusions from the
+ * embed-transclusions plugin).
  *
- * When the cursor does enter a range (e.g., via arrow keys), the decoration
- * is suppressed by the cursor-awareness check, and the raw syntax is shown.
+ * Atomic ranges make decorated ranges cursor-proof: the cursor treats them
+ * as single units, jumping over them instead of entering the middle of the
+ * decorated content. When the cursor does enter a range (via arrow keys),
+ * the decoration is suppressed by the cursor-awareness check.
  */
 
-import { EditorView } from '@codemirror/view'
+import { EditorView, Decoration } from '@codemirror/view'
 import { RangeSetBuilder, RangeValue } from '@codemirror/state'
-import { syntaxTree } from '@codemirror/language'
 import {
   WIKILINK_RE,
   EMBED_IMAGE_RE,
@@ -40,9 +42,9 @@ function buildAtomicRanges(view: EditorView): AtomicRange[] {
   const doc = state.doc
 
   for (const { from, to } of view.visibleRanges) {
-    // ── Wikilinks [[...]] ────────────────────────────────────────
     const visibleText = doc.sliceString(from, to)
 
+    // ── Wikilinks [[...]] ────────────────────────────────────
     WIKILINK_RE.lastIndex = 0
     let match: RegExpExecArray | null
     while ((match = WIKILINK_RE.exec(visibleText)) !== null) {
@@ -53,7 +55,7 @@ function buildAtomicRanges(view: EditorView): AtomicRange[] {
       }
     }
 
-    // ── Embed images ![[...]] ────────────────────────────────────
+    // ── Embed images ![[...]] ────────────────────────────────
     EMBED_IMAGE_RE.lastIndex = 0
     while ((match = EMBED_IMAGE_RE.exec(visibleText)) !== null) {
       const start = from + match.index
@@ -63,7 +65,7 @@ function buildAtomicRanges(view: EditorView): AtomicRange[] {
       }
     }
 
-    // ── Tags #tag ────────────────────────────────────────────────
+    // ── Tags #tag ────────────────────────────────────────────
     TAG_RE.lastIndex = 0
     while ((match = TAG_RE.exec(visibleText)) !== null) {
       const precedingLen = match[0].length - 1 - match[1].length
@@ -73,28 +75,18 @@ function buildAtomicRanges(view: EditorView): AtomicRange[] {
         ranges.push({ from: hashPos, to: tagEnd })
       }
     }
-
-    // ── Standard images ![alt](url) ──────────────────────────────
-    syntaxTree(state).iterate({
-      from,
-      to,
-      enter(node) {
-        if (node.name === 'Image') {
-          if (!isCursorInRange(state, node.from, node.to)) {
-            ranges.push({ from: node.from, to: node.to })
-          }
-        }
-      },
-    })
   }
 
   return ranges
 }
 
 /**
- * The atomic ranges extension. This is provided as an `EditorView.atomicRanges`
- * facet so that CM6's cursor movement code treats the decorated ranges as
- * atomic units.
+ * The atomic ranges extension.
+ *
+ * Note: The wikilinks, tags, and links plugins now self-provide atomic ranges
+ * via the `provide` pattern. This extension serves as a safety net for any
+ * ranges that might be missed (e.g., if the plugin-provided ranges don't
+ * cover all cases).
  */
 export const atomicRangesExt = EditorView.atomicRanges.of((view) => {
   const ranges = buildAtomicRanges(view)
@@ -102,7 +94,6 @@ export const atomicRangesExt = EditorView.atomicRanges.of((view) => {
     return new RangeSetBuilder<AtomicValue>().finish()
   }
 
-  // Sort by from position
   ranges.sort((a, b) => a.from - b.from)
 
   const builder = new RangeSetBuilder<AtomicValue>()

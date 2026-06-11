@@ -1,16 +1,23 @@
 /**
- * Math decoration plugin.
+ * Math decoration plugin — dual architecture.
  *
  * Handles inline ($...$) and display ($$...$$) math with KaTeX rendering.
  *
- * Key improvement over the previous implementation:
- * - Uses katex.renderToString() synchronously in toDOM() instead of the
- *   fragile setTimeout + DOM-patching approach
- * - Falls back to styled raw LaTeX if KaTeX fails to load
- * - Lazy-loads KaTeX on first use, then caches the module
+ * ## Architecture
  *
- * For display math: Decoration.replace with MathPreviewWidget
- * For inline math: Decoration.mark to hide $ delimiters, style content
+ * - **Inline math** uses a ViewPlugin with `Decoration.mark()` to hide `$`
+ *   delimiters and style the content. This is fine as a ViewPlugin because
+ *   it doesn't change the block structure.
+ *
+ * - **Display math** uses a StateField with `Decoration.replace({ block: true })`.
+ *   Display math can span multiple lines and introduces block-level widgets,
+ *   so it MUST be provided via StateField for correct viewport computation.
+ *
+ * ## KaTeX Loading
+ *
+ * KaTeX is lazy-loaded on first use. The first render shows styled raw LaTeX,
+ * then triggers an async import. On the next rebuild, the cached module is
+ * available and KaTeX renders the pretty output.
  */
 
 import {
@@ -21,7 +28,7 @@ import {
   WidgetType,
   type ViewUpdate,
 } from '@codemirror/view'
-import type { Range } from '@codemirror/state'
+import { StateField, type Range, type Transaction } from '@codemirror/state'
 import {
   hiddenMark,
   activeMark,
@@ -30,6 +37,7 @@ import {
   INLINE_MATH_RE,
   DISPLAY_MATH_RE,
 } from './shared'
+import { checkUpdateAction, dragSelectingField } from './drag-state'
 
 // ─── KaTeX Module Cache ───────────────────────────────────────────────────────
 
@@ -51,7 +59,7 @@ async function getKaTeX(): Promise<any> {
   return katexLoadPromise
 }
 
-// ─── Widget: Math Preview ─────────────────────────────────────────────────────
+// ─── Widget: Math Preview (for display math) ──────────────────────────────────
 
 class MathPreviewWidget extends WidgetType {
   constructor(
@@ -97,9 +105,77 @@ class MathPreviewWidget extends WidgetType {
   }
 }
 
-// ─── Build Decorations ────────────────────────────────────────────────────────
+// ─── Display Math: StateField ─────────────────────────────────────────────────
 
-function buildMathDecorations(view: EditorView): DecorationSet {
+function buildDisplayMathDecorations(state: import('@codemirror/state').EditorState): DecorationSet {
+  const ranges: Range<Decoration>[] = []
+  const doc = state.doc
+
+  // Display math can appear anywhere in the document
+  DISPLAY_MATH_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = DISPLAY_MATH_RE.exec(doc.toString())) !== null) {
+    const start = match.index
+    const end = start + match[0].length
+    const latex = match[1]
+
+    if (isCursorInRange(state, start, end)) {
+      ranges.push(activeMark.range(start, end))
+      continue
+    }
+
+    ranges.push(
+      Decoration.replace({
+        widget: new MathPreviewWidget(latex, true),
+        block: true,
+      }).range(start, end)
+    )
+  }
+
+  return Decoration.set(ranges, true)
+}
+
+function checkFieldAction(tr: Transaction): 'rebuild' | 'skip' | 'none' {
+  if (tr.docChanged) return 'rebuild'
+
+  const isDragging = tr.state.field(dragSelectingField, false)
+  const wasDragging = tr.startState.field(dragSelectingField, false)
+
+  if (isDragging && wasDragging) return 'skip'
+  if (wasDragging && !isDragging) return 'rebuild'
+  if (isDragging) return 'rebuild'
+
+  if (tr.selection) return 'rebuild'
+
+  return 'none'
+}
+
+/**
+ * StateField for display math ($$...$$) rendering.
+ *
+ * Uses block-level replace decorations, so must be a StateField.
+ */
+export const displayMathField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildDisplayMathDecorations(state)
+  },
+  update(deco, tr) {
+    const action = checkFieldAction(tr)
+    if (action === 'rebuild') {
+      return buildDisplayMathDecorations(tr.state)
+    }
+    if (tr.docChanged) {
+      return deco.map(tr.changes)
+    }
+    return deco
+  },
+  provide: f => EditorView.decorations.from(f),
+})
+
+// ─── Inline Math: ViewPlugin ──────────────────────────────────────────────────
+
+function buildInlineMathDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
   const state = view.state
   const doc = state.doc
@@ -107,32 +183,10 @@ function buildMathDecorations(view: EditorView): DecorationSet {
   for (const { from, to } of view.visibleRanges) {
     const visibleText = doc.sliceString(from, to)
 
-    // ── Display math $$...$$ ────────────────────────────────────
-    DISPLAY_MATH_RE.lastIndex = 0
+    INLINE_MATH_RE.lastIndex = 0
     let match: RegExpExecArray | null
 
-    while ((match = DISPLAY_MATH_RE.exec(visibleText)) !== null) {
-      const start = from + match.index
-      const end = start + match[0].length
-      const latex = match[1]
-
-      if (isCursorInRange(state, start, end)) {
-        ranges.push(activeMark.range(start, end))
-        continue
-      }
-
-      ranges.push(
-        Decoration.replace({
-          widget: new MathPreviewWidget(latex, true),
-        }).range(start, end)
-      )
-    }
-
-    // ── Inline math $...$ ───────────────────────────────────────
-    INLINE_MATH_RE.lastIndex = 0
-
     while ((match = INLINE_MATH_RE.exec(visibleText)) !== null) {
-      // The regex includes the preceding non-$ char, so we need to adjust
       const fullMatch = match[0]
       const precedingChar = fullMatch[0] !== '$' ? fullMatch[0] : ''
       const start = from + match.index + precedingChar.length
@@ -154,38 +208,38 @@ function buildMathDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true)
 }
 
-// ─── Plugin ───────────────────────────────────────────────────────────────────
-
-export const mathPlugin = ViewPlugin.fromClass(
+/**
+ * ViewPlugin for inline math ($...$) rendering.
+ *
+ * Uses mark decorations only, so ViewPlugin is fine.
+ */
+export const inlineMathPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
-    private katexLoaded = false
 
     constructor(view: EditorView) {
-      this.decorations = buildMathDecorations(view)
-      // Trigger KaTeX load on first render
+      this.decorations = buildInlineMathDecorations(view)
       this.ensureKaTeX()
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
-        this.decorations = buildMathDecorations(update.view)
-        // If KaTeX was loaded after initial render, force a re-render
-        // so math widgets get the pretty rendering
-        if (!this.katexLoaded && katexModule) {
-          this.katexLoaded = true
-          this.decorations = buildMathDecorations(update.view)
-        }
+      const action = checkUpdateAction(update)
+      if (action === 'rebuild') {
+        this.decorations = buildInlineMathDecorations(update.view)
+      }
+      // If KaTeX was loaded after initial render, force a re-render
+      if (!this.katexLoaded && katexModule) {
+        this.katexLoaded = true
+        this.decorations = buildInlineMathDecorations(update.view)
       }
     }
+
+    private katexLoaded = false
 
     private async ensureKaTeX() {
       const katex = await getKaTeX()
       if (katex && !this.katexLoaded) {
         this.katexLoaded = true
-        // Force re-render with KaTeX available
-        // We can't directly access the view here, but the next update will
-        // use the cached katexModule
       }
     }
   },
@@ -193,3 +247,12 @@ export const mathPlugin = ViewPlugin.fromClass(
     decorations: (v) => v.decorations,
   }
 )
+
+/**
+ * Combined math plugin array — for backward compatibility and simpler registration.
+ * Returns both the display math StateField and the inline math ViewPlugin.
+ */
+export const mathPlugin: import('@codemirror/state').Extension[] = [
+  displayMathField,
+  inlineMathPlugin,
+]

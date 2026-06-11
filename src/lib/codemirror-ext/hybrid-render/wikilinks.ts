@@ -11,6 +11,8 @@
  *    When cursor enters, raw syntax is shown.
  *
  * Uses regex scanning since the lezer parser doesn't understand [[...]] syntax.
+ * Provides atomic ranges so the cursor treats decorated wikilinks/embeds as
+ * single units.
  */
 
 import {
@@ -29,7 +31,10 @@ import {
   isCursorInRange,
   WIKILINK_RE,
   EMBED_IMAGE_RE,
+  collectSkipRanges,
+  isInRangeList,
 } from './shared'
+import { checkUpdateAction } from './drag-state'
 
 // ─── Image Extensions ─────────────────────────────────────────────────────────
 
@@ -67,8 +72,6 @@ class EmbedImageWidget extends WidgetType {
     container.setAttribute('data-embed-image', this.filename)
 
     const img = document.createElement('img')
-    // For local storage, images are stored as data URLs in the note content
-    // The URL will be resolved client-side. For now, use a placeholder approach.
     img.alt = this.filename
     img.className = 'cm-hybrid-image-thumb'
     img.loading = 'lazy'
@@ -80,16 +83,12 @@ class EmbedImageWidget extends WidgetType {
       img.height = this.height
     }
 
-    // Try to use the filename as a path for local resolution
-    // If it's a data URL already, use it directly
     if (this.filename.startsWith('data:')) {
       img.src = this.filename
     } else {
-      // Mark for client-side resolution
       img.dataset.embedSrc = this.filename
-      // Show filename as placeholder until resolved
       container.classList.add('cm-hybrid-image-pending')
-      img.src = ''  // Will be populated by client-side handler
+      img.src = ''
     }
 
     img.onerror = () => {
@@ -115,6 +114,8 @@ function buildWikilinkDecorations(view: EditorView): DecorationSet {
   const doc = state.doc
 
   for (const { from, to } of view.visibleRanges) {
+    // Collect skip ranges (code blocks, inline code) to avoid false matches
+    const skipRanges = collectSkipRanges(state, from, to)
     const visibleText = doc.sliceString(from, to)
 
     // ── Embed images: ![[image.png|300]] ────────────────────────
@@ -125,6 +126,10 @@ function buildWikilinkDecorations(view: EditorView): DecorationSet {
     while ((match = EMBED_IMAGE_RE.exec(visibleText)) !== null) {
       const start = from + match.index
       const end = start + match[0].length
+
+      // Skip if inside code block or inline code
+      if (isInRangeList(start, end, skipRanges)) continue
+
       const filename = match[1]
       const sizeSpec = match[2]
 
@@ -160,6 +165,10 @@ function buildWikilinkDecorations(view: EditorView): DecorationSet {
     while ((match = WIKILINK_RE.exec(visibleText)) !== null) {
       const start = from + match.index
       const end = start + match[0].length
+
+      // Skip if inside code block or inline code
+      if (isInRangeList(start, end, skipRanges)) continue
+
       const target = match[1]
       const label = match[2]
 
@@ -205,12 +214,18 @@ export const wikilinksPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      const action = checkUpdateAction(update)
+      if (action === 'rebuild') {
         this.decorations = buildWikilinkDecorations(update.view)
       }
     }
   },
   {
     decorations: (v) => v.decorations,
+    // Provide atomic ranges so cursor jumps over decorated wikilinks/embeds
+    provide: (plugin) =>
+      EditorView.atomicRanges.of((view) => {
+        return view.plugin(plugin)?.decorations || Decoration.none
+      }),
   }
 )

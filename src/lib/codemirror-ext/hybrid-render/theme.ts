@@ -3,6 +3,9 @@
  *
  * Uses EditorView.baseTheme with &dark selectors for dark mode.
  * All CSS class names follow the `cm-hybrid-*` convention.
+ *
+ * Includes smooth CSS transitions for mark hide/show animations,
+ * which is a key part of the Obsidian Live Preview feel.
  */
 
 import { EditorView } from '@codemirror/view'
@@ -169,6 +172,40 @@ export const hybridRenderTheme = EditorView.baseTheme({
   '.cm-hybrid-heading-mark': {
     opacity: '0.3',
     fontSize: '0.85em',
+    transition: 'opacity 0.2s ease, font-size 0.2s ease',
+  },
+
+  // ─── Heading size styling (H1-H6) ──────────────────────────────────────
+  '.cm-hybrid-h1': {
+    fontSize: '1.6em',
+    fontWeight: '700',
+    lineHeight: '1.3',
+  },
+  '.cm-hybrid-h2': {
+    fontSize: '1.4em',
+    fontWeight: '600',
+    lineHeight: '1.3',
+  },
+  '.cm-hybrid-h3': {
+    fontSize: '1.2em',
+    fontWeight: '600',
+    lineHeight: '1.3',
+  },
+  '.cm-hybrid-h4': {
+    fontSize: '1.1em',
+    fontWeight: '600',
+    lineHeight: '1.3',
+  },
+  '.cm-hybrid-h5': {
+    fontSize: '1em',
+    fontWeight: '600',
+    lineHeight: '1.3',
+  },
+  '.cm-hybrid-h6': {
+    fontSize: '0.9em',
+    fontWeight: '600',
+    lineHeight: '1.3',
+    color: '#666',
   },
 
   // ─── Emphasis marks (hidden **, *, etc.) ────────────────────────────────
@@ -181,6 +218,7 @@ export const hybridRenderTheme = EditorView.baseTheme({
     verticalAlign: 'middle',
     position: 'absolute',
     pointerEvents: 'none',
+    transition: 'font-size 0.15s ease, width 0.15s ease, opacity 0.15s ease',
   },
 
   // ─── Strikethrough marks (hidden ~~) ────────────────────────────────────
@@ -193,12 +231,14 @@ export const hybridRenderTheme = EditorView.baseTheme({
     verticalAlign: 'middle',
     position: 'absolute',
     pointerEvents: 'none',
+    transition: 'font-size 0.15s ease, width 0.15s ease, opacity 0.15s ease',
   },
 
   // ─── Blockquote mark (faded >) ──────────────────────────────────────────
   '.cm-hybrid-quote-mark': {
     opacity: '0.3',
     fontSize: '0.85em',
+    transition: 'opacity 0.2s ease',
   },
 
   // ─── Callout decorations ────────────────────────────────────────────────
@@ -327,6 +367,122 @@ export const hybridRenderTheme = EditorView.baseTheme({
     height: '0',
   },
 
+  // ─── Comment indicator ──────────────────────────────────────────────────
+  '.cm-hybrid-comment-indicator': {
+    display: 'inline',
+    color: '#94a3b8',
+    fontSize: '0.6em',
+    verticalAlign: 'super',
+    cursor: 'default',
+    userSelect: 'none',
+  },
+
+  // ─── Comment active state ───────────────────────────────────────────────
+  '.cm-hybrid-comment': {
+    backgroundColor: 'rgba(148, 163, 184, 0.1)',
+    borderRadius: '2px',
+  },
+
+  // ─── Block reference styling ────────────────────────────────────────────
+  '.cm-hybrid-block-ref': {
+    color: '#7c5cfc',
+    backgroundColor: 'rgba(124, 92, 252, 0.08)',
+    borderRadius: '2px',
+    padding: '0 2px',
+    fontSize: '0.85em',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-geist-mono), monospace',
+  },
+
+  // ─── Embed transclusion widget ──────────────────────────────────────────
+  '.cm-hybrid-embed-transclusion': {
+    border: '1px solid rgba(0, 0, 0, 0.08)',
+    borderRadius: '6px',
+    padding: '8px 12px',
+    margin: '4px 0',
+    background: 'rgba(0, 0, 0, 0.02)',
+    fontSize: '0.9em',
+  },
+  '.cm-hybrid-embed-header': {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    marginBottom: '4px',
+    color: '#7c5cfc',
+    fontWeight: '500',
+  },
+  '.cm-hybrid-embed-icon': {
+    fontSize: '0.8em',
+    opacity: '0.7',
+  },
+  '.cm-hybrid-embed-name': {
+    color: '#7c5cfc',
+    textDecoration: 'underline',
+    textDecorationStyle: 'dotted',
+    textUnderlineOffset: '2px',
+    cursor: 'pointer',
+  },
+  '.cm-hybrid-embed-heading': {
+    color: '#666',
+    fontSize: '0.85em',
+  },
+  '.cm-hybrid-embed-block': {
+    color: '#999',
+    fontSize: '0.85em',
+    fontFamily: 'var(--font-geist-mono), monospace',
+  },
+  '.cm-hybrid-embed-content': {
+    color: '#888',
+    fontSize: '0.85em',
+    fontStyle: 'italic',
+  },
+
+  // ─── Frontmatter collapsed widget ───────────────────────────────────────
+  '.cm-hybrid-frontmatter-collapsed': {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '4px 8px',
+    margin: '2px 0',
+    background: 'rgba(0, 0, 0, 0.03)',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    userSelect: 'none',
+    fontSize: '0.9em',
+    color: '#666',
+    transition: 'background 0.15s ease',
+  },
+  '.cm-hybrid-frontmatter-collapsed:hover': {
+    background: 'rgba(0, 0, 0, 0.06)',
+  },
+  '.cm-hybrid-frontmatter-expanded': {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '2px 8px',
+    margin: '2px 0',
+    cursor: 'pointer',
+    userSelect: 'none',
+    fontSize: '0.85em',
+    color: '#888',
+  },
+  '.cm-hybrid-frontmatter-toggle': {
+    fontSize: '0.7em',
+    transition: 'transform 0.15s ease',
+  },
+  '.cm-hybrid-frontmatter-label': {
+    fontWeight: '500',
+    letterSpacing: '0.02em',
+  },
+  '.cm-hybrid-frontmatter-line': {
+    // Subtle indicator for frontmatter lines
+  },
+
+  // ─── Admonition (code-block callout) ────────────────────────────────────
+  '.cm-hybrid-admonition': {
+    // Additional class on top of cm-hybrid-callout for code-block admonitions
+  },
+
   // ────────────────────────────────────────────────────────────────────────
   // ─── Dark Mode Overrides ───────────────────────────────────────────────
   // ────────────────────────────────────────────────────────────────────────
@@ -373,6 +529,9 @@ export const hybridRenderTheme = EditorView.baseTheme({
   '&dark .cm-hybrid-heading-mark': {
     opacity: '0.25',
   },
+  '&dark .cm-hybrid-h6': {
+    color: '#999',
+  },
   '&dark .cm-hybrid-quote-mark': {
     opacity: '0.25',
   },
@@ -399,5 +558,46 @@ export const hybridRenderTheme = EditorView.baseTheme({
   '&dark .cm-hybrid-callout-marker-danger': { backgroundColor: 'rgba(255, 23, 68, 0.15)' },
   '&dark .cm-hybrid-image-pending .cm-hybrid-image-thumb': {
     background: 'rgba(255,255,255,0.05)',
+  },
+
+  // ─── Dark mode: new features ────────────────────────────────────────────
+  '&dark .cm-hybrid-comment-indicator': {
+    color: '#64748b',
+  },
+  '&dark .cm-hybrid-comment': {
+    backgroundColor: 'rgba(148, 163, 184, 0.08)',
+  },
+  '&dark .cm-hybrid-block-ref': {
+    color: '#a78bfa',
+    backgroundColor: 'rgba(167, 139, 250, 0.1)',
+  },
+  '&dark .cm-hybrid-embed-transclusion': {
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    background: 'rgba(255, 255, 255, 0.02)',
+  },
+  '&dark .cm-hybrid-embed-header': {
+    color: '#a78bfa',
+  },
+  '&dark .cm-hybrid-embed-name': {
+    color: '#a78bfa',
+  },
+  '&dark .cm-hybrid-embed-heading': {
+    color: '#aaa',
+  },
+  '&dark .cm-hybrid-embed-block': {
+    color: '#777',
+  },
+  '&dark .cm-hybrid-embed-content': {
+    color: '#777',
+  },
+  '&dark .cm-hybrid-frontmatter-collapsed': {
+    background: 'rgba(255, 255, 255, 0.04)',
+    color: '#aaa',
+  },
+  '&dark .cm-hybrid-frontmatter-collapsed:hover': {
+    background: 'rgba(255, 255, 255, 0.08)',
+  },
+  '&dark .cm-hybrid-frontmatter-expanded': {
+    color: '#888',
   },
 })

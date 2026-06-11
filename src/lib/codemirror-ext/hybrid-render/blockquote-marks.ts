@@ -20,6 +20,7 @@ import {
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
 import { quoteMarkFaded, isCursorOnLine } from './shared'
+import { checkUpdateAction } from './drag-state'
 
 function buildBlockquoteMarkDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
@@ -59,7 +60,8 @@ export const blockquoteMarksPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      const action = checkUpdateAction(update)
+      if (action === 'rebuild') {
         this.decorations = buildBlockquoteMarkDecorations(update.view)
       }
     }

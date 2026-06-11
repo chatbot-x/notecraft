@@ -20,6 +20,7 @@ import {
 import { syntaxTree } from '@codemirror/language'
 import type { EditorState, Range } from '@codemirror/state'
 import { emphasisMarkHidden, strikethroughMarkHidden, isCursorInRange } from './shared'
+import { checkUpdateAction } from './drag-state'
 
 function buildEmphasisMarkDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
@@ -33,17 +34,12 @@ function buildEmphasisMarkDecorations(view: EditorView): DecorationSet {
       enter(node) {
         // ── Emphasis marks: *, **, _, __ ────────────────────────
         if (node.name === 'EmphasisMark') {
-          // Find the parent Emphasis or StrongEmphasis node
-          // We need to check if the cursor is inside the parent range
-          // The emphasis mark is a child, so we look at the parent's range
           const parentRange = findParentRange(state, node.from, node.to)
 
           if (parentRange && isCursorInRange(state, parentRange.from, parentRange.to)) {
-            // Cursor is inside the emphasis — show raw syntax
             return
           }
 
-          // Hide the delimiter
           ranges.push(emphasisMarkHidden.range(node.from, node.to))
         }
 
@@ -66,8 +62,7 @@ function buildEmphasisMarkDecorations(view: EditorView): DecorationSet {
 
 /**
  * Find the parent node (Emphasis, StrongEmphasis, or Strikethrough)
- * that contains the given range. We need this to check cursor proximity
- * against the full emphasized span, not just the delimiter.
+ * that contains the given range.
  */
 function findParentRange(
   state: EditorState,
@@ -102,7 +97,8 @@ export const emphasisMarksPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      const action = checkUpdateAction(update)
+      if (action === 'rebuild') {
         this.decorations = buildEmphasisMarkDecorations(update.view)
       }
     }

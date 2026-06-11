@@ -6,6 +6,7 @@
  * - ![alt](url) — Replace entire image syntax with thumbnail widget
  *
  * Uses the lezer syntax tree for Link and Image nodes.
+ * Provides atomic ranges so the cursor treats images as single units.
  */
 
 import {
@@ -24,6 +25,7 @@ import {
   activeMark,
   isCursorInRange,
 } from './shared'
+import { checkUpdateAction } from './drag-state'
 
 // ─── Widget: Image Thumbnail ──────────────────────────────────────────────────
 
@@ -81,7 +83,6 @@ function buildLinkDecorations(view: EditorView): DecorationSet {
           }
 
           const text = doc.sliceString(node.from, node.to)
-          // Parse ![alt](url)
           const imgMatch = text.match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
           if (!imgMatch) return
 
@@ -98,15 +99,12 @@ function buildLinkDecorations(view: EditorView): DecorationSet {
 
         // ── Links: [label](url) ────────────────────────────────
         if (node.name === 'Link') {
-          // Skip if cursor is inside
           if (isCursorInRange(state, node.from, node.to)) return
 
           const text = doc.sliceString(node.from, node.to)
 
-          // Skip image links (handled above via Image node)
           if (text.startsWith('!')) return
 
-          // Parse [label](url)
           const linkMatch = text.match(/^\[(.+?)\]\((.+?)\)$/)
           if (!linkMatch) return
 
@@ -116,9 +114,7 @@ function buildLinkDecorations(view: EditorView): DecorationSet {
           const urlStart = labelEnd + 2 // after ](
           const urlEnd = node.to - 1 // before )
 
-          // Style the label
           ranges.push(linkLabelMark.range(labelStart, labelEnd))
-          // Fade the brackets and URL
           ranges.push(linkFadedMark.range(node.from, labelStart))
           ranges.push(linkFadedMark.range(labelEnd, urlStart))
           ranges.push(linkFadedMark.range(urlEnd, node.to))
@@ -139,12 +135,29 @@ export const linksPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      const action = checkUpdateAction(update)
+      if (action === 'rebuild') {
         this.decorations = buildLinkDecorations(update.view)
       }
     }
   },
   {
     decorations: (v) => v.decorations,
+    // Provide atomic ranges so cursor jumps over image widgets
+    provide: (plugin) =>
+      EditorView.atomicRanges.of((view) => {
+        // Only provide atomic ranges for Image nodes (not Links)
+        const decos = view.plugin(plugin)?.decorations
+        if (!decos) return Decoration.none
+
+        // Filter to only replace-type decorations (images)
+        const filtered: Range<Decoration>[] = []
+        decos.between(0, view.state.doc.length, (from, to, deco) => {
+          if (deco.spec?.widget) {
+            filtered.push(deco.range(from, to))
+          }
+        })
+        return filtered.length > 0 ? Decoration.set(filtered, true) : Decoration.none
+      }),
   }
 )

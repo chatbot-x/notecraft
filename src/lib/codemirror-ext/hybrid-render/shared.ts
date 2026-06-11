@@ -1,12 +1,14 @@
 /**
  * Shared utilities for the hybrid rendering plugins.
  *
- * Provides cursor-range checks, regex patterns, and reusable Decoration
- * objects that are shared across all feature plugins.
+ * Provides cursor-range checks, regex patterns, skip-range utilities,
+ * reusable Decoration objects, and the feature-flags type that are shared
+ * across all feature plugins.
  */
 
 import { Decoration } from '@codemirror/view'
 import type { EditorState } from '@codemirror/state'
+import { syntaxTree } from '@codemirror/language'
 
 // ─── Cursor Range Checks ─────────────────────────────────────────────────────
 
@@ -24,9 +26,59 @@ export function isCursorOnLine(state: EditorState, lineFrom: number, lineTo: num
   return state.selection.ranges.some((r) => {
     const selFrom = Math.min(r.from, r.to)
     const selTo = Math.max(r.from, r.to)
-    // Cursor is on this line if any part of the selection overlaps
     return selFrom <= lineTo && selTo >= lineFrom
   })
+}
+
+// ─── Skip Ranges ──────────────────────────────────────────────────────────────
+
+/**
+ * Collect "skip ranges" — ranges inside code blocks and inline code where
+ * regex-based plugins should NOT match. This prevents false positives like
+ * a #tag inside a code fence or a [[wikilink]] inside inline code.
+ *
+ * Returns sorted array of { from, to } ranges.
+ */
+export function collectSkipRanges(state: EditorState, from: number, to: number): Array<{ from: number; to: number }> {
+  const ranges: Array<{ from: number; to: number }> = []
+
+  syntaxTree(state).iterate({
+    from,
+    to,
+    enter(node) {
+      // Fenced code blocks, indented code blocks, and inline code
+      if (
+        node.name === 'FencedCode' ||
+        node.name === 'CodeBlock' ||
+        node.name === 'InlineCode'
+      ) {
+        ranges.push({ from: node.from, to: node.to })
+      }
+      // Also skip HTML blocks and comments
+      if (node.name === 'HTMLBlock' || node.name === 'Comment') {
+        ranges.push({ from: node.from, to: node.to })
+      }
+    },
+  })
+
+  return ranges
+}
+
+/**
+ * Check whether a position range [from, to) falls inside any skip range.
+ * Used by regex-based plugins to avoid matching inside code blocks.
+ */
+export function isInRangeList(
+  posFrom: number,
+  posTo: number,
+  ranges: Array<{ from: number; to: number }>
+): boolean {
+  for (const r of ranges) {
+    if (posFrom >= r.from && posTo <= r.to) return true
+    // Early exit since ranges are sorted
+    if (r.from > posTo) break
+  }
+  return false
 }
 
 // ─── Reusable Decoration Objects ──────────────────────────────────────────────
@@ -96,6 +148,26 @@ export const strikethroughMarkHidden = Decoration.mark({
   class: 'cm-hybrid-strikethrough-mark',
 })
 
+/** Comment text (%%content%%) — hidden */
+export const commentMark = Decoration.mark({
+  class: 'cm-hybrid-comment',
+})
+
+/** Block reference (^id) styling — clickable indicator */
+export const blockRefMark = Decoration.mark({
+  class: 'cm-hybrid-block-ref',
+})
+
+/** Embed transclusion styling */
+export const embedMark = Decoration.mark({
+  class: 'cm-hybrid-embed',
+})
+
+/** Frontmatter collapsed indicator */
+export const frontmatterCollapsedMark = Decoration.mark({
+  class: 'cm-hybrid-frontmatter-collapsed',
+})
+
 // ─── Regex Patterns ───────────────────────────────────────────────────────────
 
 /** Match [[wikilink]] or [[target|label]] */
@@ -103,6 +175,9 @@ export const WIKILINK_RE = /\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g
 
 /** Match ![[embed]] with optional size: ![[image.png|300]] or ![[image.png|300x200]] */
 export const EMBED_IMAGE_RE = /!\[\[([^\]|]+?)(?:\|(\d+(?:x\d+)?))?\]\]/g
+
+/** Match ![[embed]] for any resource (notes, headings, blocks) — non-image transclusions */
+export const EMBED_TRANSCLUDE_RE = /!\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g
 
 /** Match ![](url) or ![alt](url) — standard markdown images */
 export const IMAGE_RE = /!\[([^\]]*)\]\(([^)]+)\)/g
@@ -118,6 +193,18 @@ export const TAG_RE = /(?:^|[\s(>[,;:~"'])#([a-zA-Z_][\w/-]*)/g
 
 /** Match Obsidian callout header: > [!type] or > [!type]+ or > [!type]- */
 export const CALLOUT_HEADER_RE = /^(\s*>\s*)\[!(\w+)\]([+-]?)(?:[ \t]+(.*))?$/gm
+
+/** Match Obsidian comments: %%comment text%% (non-greedy) */
+export const COMMENT_RE = /%%([\s\S]*?)%%/g
+
+/** Match Obsidian block references: ^block-id at end of paragraph/line */
+export const BLOCK_REF_RE = /(?:^|\s)\^([a-zA-Z0-9_-]+)\s*$/gm
+
+/** Match YAML frontmatter delimiters: --- at start of doc */
+export const FRONTMATTER_RE = /^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/
+
+/** Match admonition code fence: ~~~ad-note or ```ad-warning etc. */
+export const ADMONITION_FENCE_RE = /^(~~~+|```+)\s*ad-(\w+)\s*(?:"([^"]*)")?(?:\n([\s\S]*?))?\1/gm
 
 // ─── Feature Flags Type ───────────────────────────────────────────────────────
 
@@ -150,4 +237,16 @@ export interface HybridRenderOptions {
   horizontalRules?: boolean
   /** Inline code background. Default: true */
   inlineCode?: boolean
+  /** Hide %%comments%%. Default: true */
+  comments?: boolean
+  /** Style ^block-refs as clickable indicators. Default: true */
+  blockRefs?: boolean
+  /** Render ![[note]] transclusions with placeholder widget. Default: true */
+  embedTransclusions?: boolean
+  /** Collapse YAML frontmatter with toggle. Default: true */
+  frontmatter?: boolean
+  /** Render ~~~ad-note admonition fences as callouts. Default: true */
+  admonitions?: boolean
+  /** Apply heading size styling (H1-H6 font sizes). Default: true */
+  headingSizes?: boolean
 }

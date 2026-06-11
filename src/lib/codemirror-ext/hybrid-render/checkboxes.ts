@@ -37,7 +37,6 @@ class CheckboxWidget extends WidgetType {
   }
 
   ignoreEvent(event: Event): boolean {
-    // Allow click events for toggling
     if (event instanceof MouseEvent) return false
     return true
   }
@@ -45,7 +44,6 @@ class CheckboxWidget extends WidgetType {
 
 // ─── Checkbox Click Handler ───────────────────────────────────────────────────
 
-/** Handle checkbox clicks by finding the TaskMarker and toggling it */
 function handleCheckboxClick(view: EditorView, pos: number): boolean {
   let foundFrom = -1
   let foundTo = -1
@@ -112,6 +110,8 @@ export const checkboxesPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
+      // Checkboxes don't need cursor-awareness (always show),
+      // but still rebuild on doc/viewport changes
       if (update.docChanged || update.viewportChanged) {
         this.decorations = buildCheckboxDecorations(update.view)
       }

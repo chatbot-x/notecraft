@@ -20,6 +20,7 @@ import {
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
 import { hiddenMark, isCursorInRange } from './shared'
+import { checkUpdateAction } from './drag-state'
 
 // ─── Widget: Language Badge ───────────────────────────────────────────────────
 
@@ -63,16 +64,12 @@ function buildCodeBlockDecorations(view: EditorView): DecorationSet {
 
         // Find the language info (CodeInfo child node)
         let langInfo = ''
-        let codeInfoFrom = -1
-        let codeInfoTo = -1
 
         const cursor = node.node.cursor()
         if (cursor.firstChild()) {
           do {
             if (cursor.name === 'CodeInfo') {
               langInfo = doc.sliceString(cursor.from, cursor.to).trim()
-              codeInfoFrom = cursor.from
-              codeInfoTo = cursor.to
             }
           } while (cursor.nextSibling())
         }
@@ -93,27 +90,22 @@ function buildCodeBlockDecorations(view: EditorView): DecorationSet {
 
         // ── Hide fence markers when cursor is outside ───────────
         if (!cursorInBlock) {
-          // Hide the opening fence line (```lang)
-          // Find where the fence markers start and end
           const firstLineText = doc.sliceString(firstLine.from, firstLine.to)
           const fenceMatch = firstLineText.match(/^(~~~+|```+)/)
           if (fenceMatch) {
             const fenceEnd = firstLine.from + fenceMatch[0].length
-            // Hide the fence characters but keep the language info visible
             ranges.push(hiddenMark.range(firstLine.from, fenceEnd))
 
-            // Add language badge
             if (langInfo) {
               ranges.push(
                 Decoration.widget({
                   widget: new LangBadgeWidget(langInfo),
-                  side: 1, // After the position
+                  side: 1,
                 }).range(firstLine.from)
               )
             }
           }
 
-          // Hide the closing fence line (```)
           const lastLineText = doc.sliceString(lastLine.from, lastLine.to)
           const closingFenceMatch = lastLineText.match(/^(~~~+|```+)/)
           if (closingFenceMatch) {
@@ -136,7 +128,8 @@ export const codeBlocksPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      const action = checkUpdateAction(update)
+      if (action === 'rebuild') {
         this.decorations = buildCodeBlockDecorations(update.view)
       }
     }

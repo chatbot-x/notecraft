@@ -5,7 +5,9 @@
  * This mirrors Obsidian's Live Preview behavior where heading markers are
  * invisible in reading mode but revealed when you navigate to that line.
  *
- * Uses the lezer syntax tree to find HeaderMark nodes.
+ * Also applies heading size styling (H1–H6) when headingSizes is enabled.
+ *
+ * Uses the lezer syntax tree to find HeaderMark and ATXHeading nodes.
  */
 
 import {
@@ -18,6 +20,27 @@ import {
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
 import { hiddenMark, isCursorOnLine } from './shared'
+import { checkUpdateAction } from './drag-state'
+
+// ─── Heading Size Classes ─────────────────────────────────────────────────────
+
+/** Maps heading level to CSS class for size styling */
+const HEADING_CLASSES: Record<number, string> = {
+  1: 'cm-hybrid-h1',
+  2: 'cm-hybrid-h2',
+  3: 'cm-hybrid-h3',
+  4: 'cm-hybrid-h4',
+  5: 'cm-hybrid-h5',
+  6: 'cm-hybrid-h6',
+}
+
+/** Parse heading level from ATXHeading node name (e.g., "ATXHeading3" → 3) */
+function headingLevel(name: string): number {
+  const match = name.match(/ATXHeading(\d)/)
+  return match ? parseInt(match[1], 10) : 0
+}
+
+// ─── Build Decorations ────────────────────────────────────────────────────────
 
 function buildHeadingMarkDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
@@ -29,25 +52,37 @@ function buildHeadingMarkDecorations(view: EditorView): DecorationSet {
       from,
       to,
       enter(node) {
-        if (node.name !== 'HeaderMark') return
+        // ── Heading mark hiding ──────────────────────────────────
+        if (node.name === 'HeaderMark') {
+          const line = doc.lineAt(node.from)
+          const lineFrom = line.from
+          const lineTo = line.to
 
-        // Find the line this header mark is on
-        const line = doc.lineAt(node.from)
-        const lineFrom = line.from
-        const lineTo = line.to
+          // Only hide marks when cursor is NOT on this line
+          if (isCursorOnLine(state, lineFrom, lineTo)) return
 
-        // Only hide marks when cursor is NOT on this line
-        if (isCursorOnLine(state, lineFrom, lineTo)) return
+          // Also hide the space after the # marks
+          let markEnd = node.to
+          if (markEnd < lineTo && doc.sliceString(markEnd, markEnd + 1) === ' ') {
+            markEnd++
+          }
 
-        // Also hide the space after the # marks
-        // HeaderMark covers "###" but the space after is not part of the node
-        let markEnd = node.to
-        // Check if there's a space right after the marks
-        if (markEnd < lineTo && doc.sliceString(markEnd, markEnd + 1) === ' ') {
-          markEnd++
+          ranges.push(hiddenMark.range(node.from, markEnd))
         }
 
-        ranges.push(hiddenMark.range(node.from, markEnd))
+        // ── Heading size styling ─────────────────────────────────
+        // Apply to ATXHeading nodes for visual hierarchy
+        if (node.name.startsWith('ATXHeading')) {
+          const level = headingLevel(node.name)
+          if (level > 0 && HEADING_CLASSES[level]) {
+            const line = doc.lineAt(node.from)
+            ranges.push(
+              Decoration.line({
+                class: HEADING_CLASSES[level],
+              }).range(line.from)
+            )
+          }
+        }
       },
     })
   }
@@ -64,7 +99,8 @@ export const headingMarksPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      const action = checkUpdateAction(update)
+      if (action === 'rebuild') {
         this.decorations = buildHeadingMarkDecorations(update.view)
       }
     }
