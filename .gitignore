@@ -71,3 +71,5 @@ Caddyfile
 
 # Z-AI config
 .z-ai-config
+# OpenNext build output
+.open-next/
