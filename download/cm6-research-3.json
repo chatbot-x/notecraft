@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://github.com/yeliex/codemirror-extensions",
+    "name": "yeliex/codemirror-extensions - GitHub",
+    "snippet": "codemirror extensions includes toolbar, helper, image-upload, event-emitter - yeliex/codemirror-extensions.",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/yeliex/codemirror-extensions/blob/master/package.json",
+    "name": "codemirror-extensions/package.json at master - GitHub",
+    "snippet": "codemirror extensions includes toolbar, helper, image-upload, event-emitter - codemirror-extensions/package.json at master · yeliex/codemirror-extensions.",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/list-of-community-extensions/4899",
+    "name": "List of community extensions? - v6 - discuss.CodeMirror",
+    "snippet": "This link List of Extensions only provides the list of official extensions. There are some great community extensions that are hard to find.",
+    "host_name": "discuss.codemirror.net",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/yeliex/codemirror-extensions/activity",
+    "name": "Activity · yeliex/codemirror-extensions - GitHub",
+    "snippet": "codemirror extensions includes toolbar, helper, image-upload, event-emitter - Activity · yeliex/codemirror-extensions.",
+    "host_name": "github.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/rizerphe/codemirror-companion-extension",
+    "name": "rizerphe/codemirror-companion-extension - GitHub",
+    "snippet": "This package implements inline suggestions for the CodeMirror code editor. It's a backward-compatible fork of saminzadeh's project that allows the user to ...",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

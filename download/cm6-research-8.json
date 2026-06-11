@@ -1,0 +1,29 @@
+[
+  {
+    "url": "https://talk.tiddlywiki.org/t/slash-command-with-autocomplete-menu/12019",
+    "name": "\"Slash command\" with autocomplete menu - Talk @ TiddlyWiki",
+    "snippet": "Hello, I'd like to reproduce in TW something like Notions' slash command, basically an autocompletion popup menu that does not only insert a ...",
+    "host_name": "talk.tiddlywiki.org",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/13744176/codemirror-autocomplete-after-any-keyup",
+    "name": "codemirror autocomplete after any keyup? - Stack Overflow",
+    "snippet": "I'm working on trying to add a custom autocomplete, that I want to trigger whenever the user is typing (configurable of course).",
+    "host_name": "stackoverflow.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://codemirror.net/examples/autocompletion",
+    "name": "Example: Autocompletion - CodeMirror",
+    "snippet": "The default completion keymap binds Ctrl-Space to start completion, arrows to select a completion, Enter to pick it, and Escape to close the tooltip. It is ...",
+    "host_name": "codemirror.net",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  }
+]

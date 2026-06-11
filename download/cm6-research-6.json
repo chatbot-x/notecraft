@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://github.com/0xMassi/stik_app/blob/main/CHANGELOG.md",
+    "name": "stik_app/CHANGELOG.md at main · 0xMassi/stik_app · GitHub",
+    "snippet": "Slash commands — type / at line start for Notion/Raycast-style template insertion (headings, lists, code blocks, tables, templates); Custom user templates ...",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/joelbqz/writer-computer/blob/master/CHANGELOG.md",
+    "name": "writer-computer/CHANGELOG.md at master - GitHub",
+    "snippet": "CodeMirror's bundled autocomplete theme sets color: white on &light .cm-tooltip-autocomplete ul li[aria-selected] , and our override in wiki-link-extension.",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/JefMari/awesome-wysiwyg-editors",
+    "name": "A curated list of awesome WYSIWYG Editors. - GitHub",
+    "snippet": "Being a Codemirror 6 Extension, this can be used with any Framework. jQuery Based. jQuery required editors. bootstrap-wysiwyg - Tiny bootstrap-compatible ...",
+    "host_name": "github.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/konhi/obsidian-community-list/blob/main/lists/plugins.md",
+    "name": "obsidian-community-list/lists/plugins.md at main - GitHub",
+    "snippet": "Adds Notion-style slash command autocompletion, for fast insertion of Markdown blocks, formatting, and commands directly from the editor.",
+    "host_name": "github.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/rochacbruno/my-awesome-stars",
+    "name": "rochacbruno/my-awesome-stars - GitHub",
+    "snippet": "VeryCB/flask-slack - a Flask extension which makes it easy to interact with Slack slash commands. tobgu/pyrsistent - Persistent/Immutable/Functional data ...",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/bodrick/awesome",
+    "name": "bodrick/awesome - GitHub",
+    "snippet": "steven-tey/novel - Notion-style WYSIWYG editor with AI-powered autocompletion. ... codemirror/codemirror5 - In-browser code editor (version 5, ...",
+    "host_name": "github.com",
+    "rank": 5,
+    "date": "Jun 9, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/cryptpad/cryptpad/blob/main/CHANGELOG.md",
+    "name": "cryptpad/CHANGELOG.md at main - GitHub",
+    "snippet": "This release introduces an updated version of the Diagram app, now powered by Drawio 29. The app now defaults to the \"sketch\" theme, a simple infinite ...",
+    "host_name": "github.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/ManUtopiK/awesome-stars",
+    "name": "ManUtopiK/awesome-stars: A curated list of my GitHub stars!",
+    "snippet": "njbSaab/njx-css-ui - The simplest CSS library for modern landing pages. Drop in one link — get themes, components, and utility classes instantly.",
+    "host_name": "github.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/puppetlabs/hashicorp-vault/blob/master/CHANGELOG.md",
+    "name": "hashicorp-vault/CHANGELOG.md at master - GitHub",
+    "snippet": "A tool for secrets management, encryption as a service, and privileged access management - hashicorp-vault/CHANGELOG.md at master ...",
+    "host_name": "github.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/krzemienski/awesome-from-stars",
+    "name": "krzemienski/awesome-from-stars - GitHub",
+    "snippet": "19 slash commands, 6 MCP configs (600-5000 tokens), quality gates, and health monitoring. Ship faster, ship safer, ship smarter. jeremylongshore/claude-code ...",
+    "host_name": "github.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

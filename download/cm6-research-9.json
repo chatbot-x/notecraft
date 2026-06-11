@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://github.com/segphault/codemirror-rich-markdoc",
+    "name": "CodeMirror 6 plugin that supports rich Markdown editing · GitHub",
+    "snippet": "A plugin for CodeMirror 6 that adds a hybrid rich-text editing mode for Markdown content. It applies rich-text styling to Markdown content and hides the ...",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/markdoc/markdoc/discussions/445",
+    "name": "Monaco or Coremirror support? · markdoc markdoc · Discussion #445",
+    "snippet": "I made a very rough prototype of a hybrid rich-text Markdoc editor for CodeMirror 6 earlier this year. ... The code is here: https://github.com/segphault/ ...",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.blog/changelog/2021-07-13-the-github-releases-markdown-editor-now-has-an-editor-toolbar",
+    "name": "The GitHub Releases Markdown Editor now has an editor toolbar",
+    "snippet": "The markdown editor used when creating or editing a release in a GitHub repository now has a text-editing toolbar.",
+    "host_name": "github.blog",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/implementing-wysiwyg-markdown-editor-in-codemirror/2403",
+    "name": "Implementing WYSIWYG Markdown editor in CodeMirror",
+    "snippet": "It's basically a WYSIWYG editor in CodeMirror. Inline elements like bold and italics would display their markup upon being edited, and inline HTML will expand ...",
+    "host_name": "discuss.codemirror.net",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://npmjs.com/package/codemirror-toolbar",
+    "name": "codemirror-toolbar - NPM",
+    "snippet": "toolbar view render for codemirror. Latest version: 0.1.0, last published: 2 years ago. Start using codemirror-toolbar in your project by ...",
+    "host_name": "npmjs.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://www.reddit.com/r/ObsidianMD/comments/1ctxaim/replacing_for_quick_formatting_and_editing_like",
+    "name": "Replacing ( / ) for quick formatting and editing like in notion? - Reddit",
+    "snippet": "There's a core plugin that implements this: Slash commands. Trigger commands in the editor by using the forward slash key. Look for it in the ...",
+    "host_name": "www.reddit.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/multiple-editable-columns-with-codemirror-6/8514",
+    "name": "Multiple Editable Columns with CodeMirror 6 - v6",
+    "snippet": "My north star goal is to provide a Layout experience similar to that of Confluence/Notion, where you're able to create an N-column layout and each of the ...",
+    "host_name": "discuss.codemirror.net",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://meta.discourse.org/t/feature-suggestion-for-rich-text-editor-slash-command-a-la-notion/387188",
+    "name": "Feature suggestion for Rich Text Editor: `/` Slash Command (a la",
+    "snippet": "How about adding a / command feature with a context menu when a user is on a new/empty line to offer creating specific elements such as images, ...",
+    "host_name": "meta.discourse.org",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://eddyter.com/blogs/how-to-build-notion-like-editor-saas",
+    "name": "How to Build a Notion-Like Editor in 2026 (30 Min Guide) - Eddyter",
+    "snippet": "Build a Notion-like editor for your SaaS in 30 minutes with Eddyter. Slash commands, AI, and tables built in. Saves 4-6 months vs custom build ...",
+    "host_name": "eddyter.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://liveblocks.io/blog/which-rich-text-editor-framework-should-you-choose-in-2025",
+    "name": "Which rich text editor framework should you choose in 2025?",
+    "snippet": "Looking to integrate a WYSIWYG editor into your JavaScript app? This comparison dives into the best frameworks available, including Tiptap, Lexical, BlockNote, ...",
+    "host_name": "liveblocks.io",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=cBdyHp_XVFQ",
+    "name": "Using slash commands - YouTube",
+    "snippet": "... slash commands! You can learn more in this page of our Help Center: https://www.notion.so/Learn-the-shortcuts-66e28cec810548c3a4061513126766b0.\nThere's a ton of different content types you can add to a Notion page, from text & images to powerful databases.",
+    "host_name": "www.youtube.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/help-needed-new-to-codemirror-best-way-to-learn/4149",
+    "name": "[Help Needed] New to CodeMirror, best way to learn? - v6",
+    "snippet": "I know that I need to use decorators, which add styling to the CodeMirror instance, like adding tags to element, making them headers, and so on.",
+    "host_name": "discuss.codemirror.net",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=-YYv2zKctKs",
+    "name": "The Top 3 Notion Alternatives in 2025 - YouTube",
+    "snippet": "Welcome to the ultimate guide to Notion alternatives for 2024! In this video, Demitri dives deep into three powerful productivity tools that ...",
+    "host_name": "www.youtube.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/codemirror-6-quickstart-and-learn-by-examples/5375",
+    "name": "CodeMirror 6 Quickstart and Learn-By-Examples",
+    "snippet": "I created a repo here which contains the quickstart guide and examples I wish I had when I was learning CodeMirror 6.",
+    "host_name": "discuss.codemirror.net",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.notion.com/help/guides/using-slash-commands",
+    "name": "Using slash commands - Notion",
+    "snippet": "Use Notion's slash commands to add or modify content quickly. You can add a quote, highlight, or a web bookmark with /quote, /callout, or /web respectively.",
+    "host_name": "www.notion.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://discuss.codemirror.net/t/codemirror-6-and-typescript-lsp/3398",
+    "name": "Codemirror 6 and Typescript LSP - v6",
+    "snippet": "I am currently trying to enrich our code editor experience in our browser application by using LSP to try to autocomplete what the user would like to type.",
+    "host_name": "discuss.codemirror.net",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://codemirror.net/examples/autocompletion",
+    "name": "Example: Autocompletion - CodeMirror",
+    "snippet": "The @codemirror/autocomplete package provides functionality for displaying input suggestions in the editor. This example shows how to enable it and how to write ...",
+    "host_name": "codemirror.net",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/codemirror/dev/issues/1346",
+    "name": "Support custom commit characters in autocomplete #1346 - GitHub",
+    "snippet": "The issue is the LSP response contains the commit characters, but the @codemirror/autocomplete Completion type does not allow me to pass any ...",
+    "host_name": "github.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/wrap-modify-existing-autocompletes/4376",
+    "name": "Wrap/Modify Existing Autocompletes - v6 - discuss.CodeMirror",
+    "snippet": "Is there a way to wrap/modify existing code autocompletes? I want to use @codemirror/lang-sql but modify the format that gets shown.",
+    "host_name": "discuss.codemirror.net",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.codiga.io/blog/implement-codemirror-6-in-react",
+    "name": "Implementing CodeMirror 6 in React with Code Snippets  - Codiga",
+    "snippet": "We are going to use the autocomplete extension to suggest code snippets. To provide completions we are going to need a completion source. This ...",
+    "host_name": "www.codiga.io",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/19244449/codemirror-autocomplete-custom-list",
+    "name": "CodeMirror AutoComplete Custom List - Stack Overflow",
+    "snippet": "I want to enable auto complete for both HTML and JavaScript. Currently I can only get one working at a time using eg: CodeMirror.commands.autocomplete = ...",
+    "host_name": "stackoverflow.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/custom-autocomplete-in-version-6/8918",
+    "name": "Custom Autocomplete in version 6 - v6 - discuss.CodeMirror",
+    "snippet": "Hi I have usecase of custom autocomplete in which suggestions are fetched from api by picking up the text from editor, and in that custom ...",
+    "host_name": "discuss.codemirror.net",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.npmjs.com/package/@codemirror/autocomplete",
+    "name": "@codemirror/autocomplete - npm",
+    "snippet": "This package implements autocompletion for the CodeMirror code editor. The project page has more information, a number of examples and the documentation.",
+    "host_name": "www.npmjs.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/autocomplete-in-javascript-for-custom-api/7341",
+    "name": "Autocomplete in Javascript for custom API - v6 - discuss.CodeMirror",
+    "snippet": "It uses @typescript/vfs (npm page) for the type inference, and implements linter, autocomplete, hover tooltips. The way the code is written, I ...",
+    "host_name": "discuss.codemirror.net",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discuss.codemirror.net/t/dynamic-autocompletion/6565",
+    "name": "Dynamic autocompletion - v6 - discuss.CodeMirror",
+    "snippet": "Hey everyone, I've created a code-editor using codemirror in react js. i want to provide dynamic autocompletion in the editor using tern js.",
+    "host_name": "discuss.codemirror.net",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]
