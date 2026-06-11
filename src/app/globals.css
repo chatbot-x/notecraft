@@ -223,10 +223,15 @@
   background: var(--accent);
 }
 
-/* Markdown Preview Styles */
+/* ══════════════════════════════════════════════════════════════════════════════
+   Markdown Preview — Production-Grade Rendering Styles
+   ══════════════════════════════════════════════════════════════════════════════ */
+
 .markdown-preview {
-  line-height: 1.7;
+  line-height: 1.75;
   color: var(--foreground);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .markdown-preview > *:first-child {
@@ -254,7 +259,668 @@
   background: oklch(0.4 0 0 / 35%);
 }
 
-/* Selection color */
+/* ─── Headings ────────────────────────────────────────────────────────────── */
+
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  scroll-margin-top: 2rem;
+}
+
+.markdown-preview h1 {
+  font-size: 1.875em;
+  letter-spacing: -0.025em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-preview h2 {
+  font-size: 1.5em;
+  letter-spacing: -0.02em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-preview h3 { font-size: 1.25em; }
+.markdown-preview h4 { font-size: 1.1em; }
+.markdown-preview h5 { font-size: 1em; }
+.markdown-preview h6 { font-size: 0.9em; color: var(--muted-foreground); }
+
+.markdown-preview h1 .header-anchor,
+.markdown-preview h2 .header-anchor,
+.markdown-preview h3 .header-anchor {
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-left: 0.3em;
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+
+.markdown-preview h1:hover .header-anchor,
+.markdown-preview h2:hover .header-anchor,
+.markdown-preview h3:hover .header-anchor {
+  opacity: 1;
+}
+
+/* ─── Paragraphs & Inline ────────────────────────────────────────────────── */
+
+.markdown-preview p {
+  margin-bottom: 1em;
+}
+
+.markdown-preview strong {
+  font-weight: 700;
+}
+
+.markdown-preview em {
+  font-style: italic;
+}
+
+.markdown-preview del {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.markdown-preview mark {
+  background: oklch(0.85 0.15 80 / 50%);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.dark .markdown-preview mark {
+  background: oklch(0.4 0.1 80 / 50%);
+}
+
+.markdown-preview sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+}
+
+.markdown-preview sup {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+
+/* ─── Links ─────────────────────────────────────────────────────────────── */
+
+.markdown-preview a {
+  color: oklch(0.55 0.2 250);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color 0.15s;
+}
+
+.dark .markdown-preview a {
+  color: oklch(0.65 0.18 250);
+}
+
+.markdown-preview a:hover {
+  color: oklch(0.45 0.25 250);
+  text-decoration-thickness: 2px;
+}
+
+.markdown-preview a.wikilink {
+  color: oklch(0.5 0.15 280);
+  text-decoration-style: dashed;
+  cursor: pointer;
+}
+
+.dark .markdown-preview a.wikilink {
+  color: oklch(0.7 0.15 280);
+}
+
+.markdown-preview a.wikilink::before {
+  content: "[[";
+  opacity: 0.5;
+}
+
+.markdown-preview a.wikilink::after {
+  content: "]]";
+  opacity: 0.5;
+}
+
+/* ─── Images ────────────────────────────────────────────────────────────── */
+
+.markdown-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1em 0;
+  cursor: zoom-in;
+  transition: box-shadow 0.2s;
+}
+
+.markdown-preview img:hover {
+  box-shadow: 0 4px 20px oklch(0 0 0 / 15%);
+}
+
+.dark .markdown-preview img:hover {
+  box-shadow: 0 4px 20px oklch(0 0 0 / 40%);
+}
+
+.medium-zoom-overlay {
+  z-index: 100;
+}
+
+.medium-zoom-image--opened {
+  z-index: 101;
+  border-radius: 0;
+}
+
+/* ─── Blockquotes ───────────────────────────────────────────────────────── */
+
+.markdown-preview blockquote {
+  border-left: 4px solid oklch(0.6 0.15 250);
+  padding: 0.5em 1em;
+  margin: 1em 0;
+  color: var(--muted-foreground);
+  background: oklch(0.95 0 0);
+  border-radius: 0 8px 8px 0;
+}
+
+.dark .markdown-preview blockquote {
+  background: oklch(0.2 0 0);
+}
+
+.markdown-preview blockquote blockquote {
+  margin: 0.5em 0;
+}
+
+/* ─── Lists ─────────────────────────────────────────────────────────────── */
+
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 1.75em;
+  margin-bottom: 1em;
+}
+
+.markdown-preview ul {
+  list-style-type: disc;
+}
+
+.markdown-preview ol {
+  list-style-type: decimal;
+}
+
+.markdown-preview li {
+  margin-bottom: 0.25em;
+  line-height: 1.7;
+}
+
+.markdown-preview li > ul,
+.markdown-preview li > ol {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+/* ─── Task Lists ────────────────────────────────────────────────────────── */
+
+.markdown-preview .contains-task-list {
+  list-style: none;
+  padding-left: 0.5em;
+}
+
+.markdown-preview .contains-task-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+
+.markdown-preview .contains-task-list input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.1em;
+  height: 1.1em;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  margin-top: 0.35em;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  background: transparent;
+}
+
+.markdown-preview .contains-task-list input[type="checkbox"]:checked {
+  background: oklch(0.55 0.2 145);
+  border-color: oklch(0.55 0.2 145);
+}
+
+.dark .markdown-preview .contains-task-list input[type="checkbox"]:checked {
+  background: oklch(0.6 0.18 145);
+  border-color: oklch(0.6 0.18 145);
+}
+
+.markdown-preview .contains-task-list input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.markdown-preview .contains-task-list input[type="checkbox"]:hover {
+  border-color: oklch(0.5 0.15 250);
+}
+
+/* ─── Inline Code ───────────────────────────────────────────────────────── */
+
+.markdown-preview code {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.875em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: oklch(0.93 0 0);
+  color: oklch(0.4 0.12 20);
+}
+
+.dark .markdown-preview code {
+  background: oklch(0.25 0 0);
+  color: oklch(0.8 0.1 20);
+}
+
+/* ─── Code Blocks (Shiki + custom wrapper) ──────────────────────────────── */
+
+.markdown-preview .code-block-wrapper {
+  position: relative;
+  margin: 1em 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.markdown-preview .code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: oklch(0.95 0 0);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.dark .markdown-preview .code-block-header {
+  background: oklch(0.18 0 0);
+}
+
+.markdown-preview .code-block-lang {
+  color: var(--muted-foreground);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.markdown-preview .code-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--font-sans), sans-serif;
+  transition: all 0.15s;
+}
+
+.markdown-preview .code-copy-btn:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.markdown-preview .code-copy-btn.copied {
+  color: oklch(0.55 0.2 145);
+  border-color: oklch(0.55 0.2 145 / 50%);
+}
+
+.markdown-preview .code-block-body {
+  display: flex;
+  overflow-x: auto;
+}
+
+.markdown-preview .line-numbers {
+  display: flex;
+  flex-direction: column;
+  padding: 1em 0.75em 1em 0;
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.markdown-preview .line-numbers .line-number {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.8em;
+  line-height: 1.65;
+  color: oklch(0.6 0 0);
+}
+
+.dark .markdown-preview .line-numbers .line-number {
+  color: oklch(0.45 0 0);
+}
+
+.markdown-preview .code-content {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.markdown-preview .code-content pre {
+  margin: 0;
+  padding: 1em;
+  background: transparent !important;
+  overflow: visible;
+}
+
+.markdown-preview .code-content pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85em;
+  line-height: 1.65;
+}
+
+/* Fallback pre (no Shiki) */
+.markdown-preview pre {
+  margin: 1em 0;
+  padding: 1em;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.65;
+}
+
+.markdown-preview pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* ─── Tables ────────────────────────────────────────────────────────────── */
+
+.markdown-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.9em;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.markdown-preview thead {
+  background: oklch(0.95 0 0);
+}
+
+.dark .markdown-preview thead {
+  background: oklch(0.2 0 0);
+}
+
+.markdown-preview th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+
+.markdown-preview td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.markdown-preview tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-preview tr:hover {
+  background: oklch(0.97 0 0);
+}
+
+.dark .markdown-preview tr:hover {
+  background: oklch(0.22 0 0);
+}
+
+/* ─── Horizontal Rule ──────────────────────────────────────────────────── */
+
+.markdown-preview hr {
+  border: none;
+  height: 2px;
+  background: var(--border);
+  margin: 2em 0;
+}
+
+/* ─── Footnotes ─────────────────────────────────────────────────────────── */
+
+.markdown-preview .footnotes {
+  margin-top: 2em;
+  padding-top: 1em;
+  border-top: 1px solid var(--border);
+  font-size: 0.85em;
+  color: var(--muted-foreground);
+}
+
+.markdown-preview .footnotes ol {
+  padding-left: 1.5em;
+}
+
+.markdown-preview sup a.footnote-ref {
+  color: oklch(0.55 0.15 250);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.dark .markdown-preview sup a.footnote-ref {
+  color: oklch(0.7 0.15 250);
+}
+
+.markdown-preview a.footnote-backref {
+  text-decoration: none;
+  color: var(--muted-foreground);
+}
+
+/* ─── KaTeX Math ────────────────────────────────────────────────────────── */
+
+.markdown-preview .katex-display {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+}
+
+.markdown-preview .katex {
+  font-size: 1.05em;
+}
+
+/* ─── Mermaid Diagrams ──────────────────────────────────────────────────── */
+
+.markdown-preview .mermaid-container {
+  margin: 1em 0;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1em;
+  background: oklch(0.98 0 0);
+  overflow-x: auto;
+}
+
+.dark .markdown-preview .mermaid-container {
+  background: oklch(0.18 0 0);
+}
+
+.markdown-preview .mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-preview .mermaid-error {
+  color: oklch(0.55 0.2 25);
+  font-size: 0.9em;
+  text-align: left;
+}
+
+.markdown-preview .mermaid-loading {
+  opacity: 0.5;
+}
+
+/* ─── Callouts / Admonitions ────────────────────────────────────────────── */
+
+.markdown-preview .callout {
+  margin: 1em 0;
+  border-radius: 8px;
+  border-left: 4px solid var(--border);
+  padding: 0.75em 1em;
+  overflow: hidden;
+}
+
+.markdown-preview .callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-weight: 600;
+  font-size: 0.95em;
+  margin-bottom: 0.5em;
+}
+
+.markdown-preview .callout-icon {
+  font-size: 1.1em;
+  flex-shrink: 0;
+}
+
+.markdown-preview .callout-title-text {
+  text-transform: capitalize;
+}
+
+.markdown-preview .callout-content {
+  font-size: 0.95em;
+  line-height: 1.6;
+}
+
+.markdown-preview .callout-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Callout type colors */
+.markdown-preview .callout-note {
+  border-left-color: oklch(0.55 0.15 250);
+  background: oklch(0.95 0.03 250);
+}
+.markdown-preview .callout-note .callout-icon { color: oklch(0.55 0.15 250); }
+
+.markdown-preview .callout-info {
+  border-left-color: oklch(0.55 0.15 210);
+  background: oklch(0.95 0.03 210);
+}
+.markdown-preview .callout-info .callout-icon { color: oklch(0.55 0.15 210); }
+
+.markdown-preview .callout-tip {
+  border-left-color: oklch(0.55 0.18 145);
+  background: oklch(0.95 0.04 145);
+}
+.markdown-preview .callout-tip .callout-icon { color: oklch(0.55 0.18 145); }
+
+.markdown-preview .callout-success {
+  border-left-color: oklch(0.55 0.2 145);
+  background: oklch(0.95 0.04 145);
+}
+.markdown-preview .callout-success .callout-icon { color: oklch(0.55 0.2 145); }
+
+.markdown-preview .callout-question {
+  border-left-color: oklch(0.6 0.15 55);
+  background: oklch(0.95 0.04 55);
+}
+.markdown-preview .callout-question .callout-icon { color: oklch(0.6 0.15 55); }
+
+.markdown-preview .callout-warning {
+  border-left-color: oklch(0.65 0.18 55);
+  background: oklch(0.96 0.05 55);
+}
+.markdown-preview .callout-warning .callout-icon { color: oklch(0.65 0.18 55); }
+
+.markdown-preview .callout-failure {
+  border-left-color: oklch(0.55 0.2 25);
+  background: oklch(0.95 0.04 25);
+}
+.markdown-preview .callout-failure .callout-icon { color: oklch(0.55 0.2 25); }
+
+.markdown-preview .callout-danger {
+  border-left-color: oklch(0.55 0.22 20);
+  background: oklch(0.95 0.05 20);
+}
+.markdown-preview .callout-danger .callout-icon { color: oklch(0.55 0.22 20); }
+
+.markdown-preview .callout-bug {
+  border-left-color: oklch(0.55 0.18 310);
+  background: oklch(0.95 0.04 310);
+}
+.markdown-preview .callout-bug .callout-icon { color: oklch(0.55 0.18 310); }
+
+.markdown-preview .callout-example {
+  border-left-color: oklch(0.5 0.1 280);
+  background: oklch(0.95 0.02 280);
+}
+.markdown-preview .callout-example .callout-icon { color: oklch(0.5 0.1 280); }
+
+.markdown-preview .callout-quote {
+  border-left-color: oklch(0.5 0 0);
+  background: oklch(0.96 0 0);
+}
+.markdown-preview .callout-quote .callout-icon { color: oklch(0.5 0 0); }
+
+.markdown-preview .callout-abstract {
+  border-left-color: oklch(0.5 0.12 200);
+  background: oklch(0.95 0.03 200);
+}
+.markdown-preview .callout-abstract .callout-icon { color: oklch(0.5 0.12 200); }
+
+.markdown-preview .callout-todo {
+  border-left-color: oklch(0.55 0.15 250);
+  background: oklch(0.95 0.02 250);
+}
+.markdown-preview .callout-todo .callout-icon { color: oklch(0.55 0.15 250); }
+
+/* Dark mode callout overrides */
+.dark .markdown-preview .callout-note { background: oklch(0.2 0.03 250); }
+.dark .markdown-preview .callout-info { background: oklch(0.2 0.03 210); }
+.dark .markdown-preview .callout-tip { background: oklch(0.2 0.04 145); }
+.dark .markdown-preview .callout-success { background: oklch(0.2 0.04 145); }
+.dark .markdown-preview .callout-question { background: oklch(0.2 0.04 55); }
+.dark .markdown-preview .callout-warning { background: oklch(0.22 0.05 55); }
+.dark .markdown-preview .callout-failure { background: oklch(0.2 0.04 25); }
+.dark .markdown-preview .callout-danger { background: oklch(0.22 0.05 20); }
+.dark .markdown-preview .callout-bug { background: oklch(0.2 0.04 310); }
+.dark .markdown-preview .callout-example { background: oklch(0.2 0.02 280); }
+.dark .markdown-preview .callout-quote { background: oklch(0.22 0 0); }
+.dark .markdown-preview .callout-abstract { background: oklch(0.2 0.03 200); }
+.dark .markdown-preview .callout-todo { background: oklch(0.2 0.02 250); }
+
+/* ─── Medium Zoom ───────────────────────────────────────────────────────── */
+
+.medium-zoom-overlay {
+  background: var(--background) !important;
+  z-index: 100;
+}
+
+.medium-zoom-image--opened {
+  z-index: 101;
+}
+
+/* ─── Selection ─────────────────────────────────────────────────────────── */
+
 ::selection {
   background: oklch(0.6 0.2 250 / 25%);
 }
@@ -263,12 +929,14 @@
   background: oklch(0.6 0.2 250 / 35%);
 }
 
-/* Smooth transitions for interactive elements */
+/* ─── Smooth transitions ──────────────────────────────────────────────── */
+
 button, a, [role="button"] {
   transition: all 0.15s ease;
 }
 
-/* Subtle focus ring */
+/* ─── Focus ring ──────────────────────────────────────────────────────── */
+
 :focus-visible {
   outline: 2px solid oklch(0.6 0.15 250);
   outline-offset: 2px;

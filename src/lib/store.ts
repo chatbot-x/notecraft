@@ -53,9 +53,9 @@ function getNoteTitle(content: string): string {
 
 export const WELCOME_NOTE_ID = '__welcome__'
 
-export const WELCOME_CONTENT = `# Welcome to NoteCraft 👋
+export const WELCOME_CONTENT = `# Welcome to NoteCraft
 
-Your markdown note-taking app, powered by **CodeMirror 6**.
+Your Obsidian-level markdown note-taking app, powered by **CodeMirror 6** and **markdown-it**.
 
 ## Keyboard Shortcuts
 
@@ -65,26 +65,93 @@ Your markdown note-taking app, powered by **CodeMirror 6**.
 | \`Ctrl + K\` | Open command palette |
 | \`Ctrl + B\` | Toggle sidebar |
 | \`Ctrl + \\\`\` | Toggle edit / preview / split |
-| \`Ctrl + +\` | Increase font size |
-| \`Ctrl + -\` | Decrease font size |
-| \`Ctrl + F\` | Search in editor |
-| \`Ctrl + Z\` | Undo |
-| \`Ctrl + Shift + Z\` | Redo |
+| \`Ctrl + Shift + F\` | Format document with Prettier |
 
-## Features
+## Markdown Features
 
-- **Markdown editing** with syntax highlighting & code folding
-- **Dark / Light mode** toggle
-- **Auto-save** to browser localStorage
-- **Multiple notes** with instant switching
-- **Search & filter** across all notes
-- **Edit / Preview / Split** view modes
-- **Command palette** for quick navigation
-- **Duplicate notes** for easy templating
+- **Bold**, *italic*, ~~strikethrough~~, and ==highlighted== text
+- H~2~O (subscript) and E=mc^2^ (superscript)
+- [[Wikilinks]] for inter-note linking
+- Task lists with interactive checkboxes
+- Footnotes[^1]
+- Custom attributes {.text-red}
+
+## Code Blocks
+
+\`\`\`typescript
+interface NoteCraft {
+  editor: "CodeMirror 6"
+  renderer: "markdown-it"
+  features: string[]
+}
+
+const app: NoteCraft = {
+  editor: "CodeMirror 6",
+  renderer: "markdown-it",
+  features: ["wikilinks", "callouts", "math", "mermaid", "katex"]
+}
+\`\`\`
+
+## Math (KaTeX)
+
+Inline math: $E = mc^2$
+
+Display math:
+
+$$
+\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}
+$$
+
+## Mermaid Diagrams
+
+\`\`\`mermaid
+graph LR
+    A[NoteCraft] --> B[Editor]
+    A --> C[Preview]
+    B --> D[CodeMirror 6]
+    C --> E[markdown-it]
+    E --> F[KaTeX]
+    E --> G[Mermaid]
+    E --> H[Callouts]
+\`\`\`
+
+## Callouts
+
+> [!note] Note
+> This is a note callout — great for highlighting important information.
+
+> [!tip] Tip
+> Try using \`Ctrl + Shift + F\` to format your Markdown with Prettier!
+
+> [!warning] Warning
+> Make sure to back up your notes regularly.
+
+> [!danger] Danger
+> Clearing browser data will delete all your notes!
+
+## Task Lists
+
+- [x] Set up CodeMirror 6 editor
+- [x] Build custom extension plugin
+- [x] Implement markdown-it rendering engine
+- [ ] Add scroll sync between editor and preview
+- [ ] Add note search within content
+
+## Tables
+
+| Feature | Engine | Status |
+|---|---|---|
+| Syntax Highlighting | Shiki | Active |
+| Math Rendering | KaTeX | Active |
+| Diagrams | Mermaid | Active |
+| Callouts | Custom Plugin | Active |
+| Wikilinks | markdown-it-wikilinks | Active |
 
 ---
 
 Start writing! Everything is saved locally in your browser.
+
+[^1]: This is a footnote example — click the reference number to jump here.
 `
 
 export const useNotesStore = create<NotesState>()(

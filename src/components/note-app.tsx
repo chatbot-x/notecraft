@@ -327,6 +327,27 @@ export function NoteApp() {
                     content={activeNote.content}
                     isDark={isDark}
                     fontSize={fontSize}
+                    onWikilinkClick={(pageName) => {
+                      // TODO: Navigate to note with matching title
+                      console.log('[Wikilink] Navigate to:', pageName)
+                    }}
+                    onTaskToggle={(lineNumber, checked) => {
+                      // Toggle the checkbox in the editor source
+                      const lines = activeNote.content.split('\n')
+                      if (lineNumber >= 0 && lineNumber < lines.length) {
+                        const line = lines[lineNumber]
+                        if (checked) {
+                          lines[lineNumber] = line.replace('[ ]', '[x]')
+                        } else {
+                          lines[lineNumber] = line.replace('[x]', '[ ]')
+                        }
+                        updateNote(activeNote.id, { content: lines.join('\n') })
+                      }
+                    }}
+                    onHeadingClick={(headingId) => {
+                      // Scroll to heading in the editor (future: scroll sync)
+                      console.log('[Heading] Click:', headingId)
+                    }}
                   />
                 </div>
               )}

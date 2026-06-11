@@ -1,15 +1,232 @@
 'use client'
 
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { renderMarkdownSync, renderMarkdown, type RenderResult } from '@/lib/renderer'
+import mediumZoom from 'medium-zoom'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MarkdownPreviewProps {
   content: string
   isDark: boolean
   fontSize: number
+  /** Callback when a wikilink is clicked in the preview */
+  onWikilinkClick?: (pageName: string) => void
+  /** Callback when a task list checkbox is toggled */
+  onTaskToggle?: (lineNumber: number, checked: boolean) => void
+  /** Callback when a heading is clicked (for scroll sync) */
+  onHeadingClick?: (headingId: string) => void
 }
 
-export function MarkdownPreview({ content, isDark, fontSize }: MarkdownPreviewProps) {
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function MarkdownPreview({
+  content,
+  isDark,
+  fontSize,
+  onWikilinkClick,
+  onTaskToggle,
+  onHeadingClick,
+}: MarkdownPreviewProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [renderResult, setRenderResult] = useState<RenderResult>({ html: '', headings: [] })
+  const [isRendering, setIsRendering] = useState(false)
+  const zoomRef = useRef<mediumZoom.Zoom | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ─── Render Markdown ──────────────────────────────────────────────────
+
+  const renderContent = useCallback(async () => {
+    if (!content.trim()) {
+      setRenderResult({ html: '', headings: [] })
+      return
+    }
+
+    setIsRendering(true)
+    try {
+      // Use sync render first for fast initial paint
+      const syncResult = renderMarkdownSync(content, { isDark })
+      setRenderResult(syncResult)
+
+      // Then do async render with Shiki highlighting
+      const asyncResult = await renderMarkdown(content, { isDark })
+      setRenderResult(asyncResult)
+    } catch (err) {
+      console.error('[MarkdownPreview] Render error:', err)
+      // Fallback to sync render
+      const fallback = renderMarkdownSync(content, { isDark })
+      setRenderResult(fallback)
+    } finally {
+      setIsRendering(false)
+    }
+  }, [content, isDark])
+
+  // Debounced rendering
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(renderContent, 150)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [renderContent])
+
+  // ─── Initialize Medium Zoom ──────────────────────────────────────────
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    // Detach previous zoom instance
+    if (zoomRef.current) {
+      zoomRef.current.detach()
+    }
+
+    // Attach zoom to all images in the preview
+    const images = containerRef.current.querySelectorAll('.markdown-preview img')
+    if (images.length > 0) {
+      zoomRef.current = mediumZoom(images, {
+        background: isDark ? 'var(--background)' : 'var(--background)',
+        margin: 24,
+      })
+    }
+
+    return () => {
+      if (zoomRef.current) {
+        zoomRef.current.detach()
+        zoomRef.current = null
+      }
+    }
+  }, [renderResult.html, isDark])
+
+  // ─── Render Mermaid Diagrams ─────────────────────────────────────────
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const mermaidContainers = containerRef.current.querySelectorAll('.mermaid-container[data-mermaid-source]')
+
+    if (mermaidContainers.length === 0) return
+
+    let cancelled = false
+
+    async function renderMermaidDiagrams() {
+      try {
+        // Dynamic import — Mermaid is heavy (~200KB), only load when needed
+        const mermaid = (await import('mermaid')).default
+
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: isDark ? 'dark' : 'default',
+          securityLevel: 'loose',
+          fontFamily: 'inherit',
+        })
+
+        for (const container of mermaidContainers) {
+          if (cancelled) break
+
+          const source = (container as HTMLElement).dataset.mermaidSource
+          if (!source) continue
+
+          try {
+            const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`
+            const { svg } = await mermaid.render(id, source)
+            if (!cancelled) {
+              container.innerHTML = svg
+              container.removeAttribute('data-mermaid-source')
+            }
+          } catch (err) {
+            console.warn('[Mermaid] Render failed:', err)
+            if (!cancelled) {
+              container.innerHTML = `<div class="mermaid-error"><p>Failed to render diagram</p><pre><code>${source}</code></pre></div>`
+              container.removeAttribute('data-mermaid-source')
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Mermaid] Library load failed:', err)
+      }
+    }
+
+    renderMermaidDiagrams()
+
+    return () => {
+      cancelled = true
+    }
+  }, [renderResult.html, isDark])
+
+  // ─── Event Delegation ────────────────────────────────────────────────
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement
+
+      // ── Copy code button ──────────────────────────────────────────
+      const copyBtn = target.closest('.code-copy-btn') as HTMLElement | null
+      if (copyBtn) {
+        e.preventDefault()
+        const code = copyBtn.dataset.code
+        if (code) {
+          // Decode HTML entities from the data attribute
+          const decoded = code
+            .replace(/&#10;/g, '\n')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+
+          navigator.clipboard.writeText(decoded).then(() => {
+            const originalTitle = copyBtn.getAttribute('title')
+            copyBtn.setAttribute('title', 'Copied!')
+            copyBtn.classList.add('copied')
+            setTimeout(() => {
+              copyBtn.setAttribute('title', originalTitle ?? 'Copy code')
+              copyBtn.classList.remove('copied')
+            }, 2000)
+          })
+        }
+        return
+      }
+
+      // ── Task list checkbox toggle ─────────────────────────────────
+      const checkbox = target.closest('input[type="checkbox"]') as HTMLInputElement | null
+      if (checkbox && checkbox.closest('.contains-task-list')) {
+        e.preventDefault()
+        const lineNumber = checkbox.dataset.line
+          ? parseInt(checkbox.dataset.line, 10)
+          : -1
+        onTaskToggle?.(lineNumber, !checkbox.checked)
+        return
+      }
+
+      // ── Wikilink click ───────────────────────────────────────────
+      const wikilink = target.closest('a.wikilink') as HTMLAnchorElement | null
+      if (wikilink) {
+        e.preventDefault()
+        const href = wikilink.getAttribute('href')
+        if (href) {
+          // Extract page name from href (strip leading /)
+          const pageName = href.replace(/^\//, '')
+          onWikilinkClick?.(pageName)
+        }
+        return
+      }
+
+      // ── Heading click (for scroll sync) ──────────────────────────
+      const heading = target.closest('h1, h2, h3, h4, h5, h6') as HTMLElement | null
+      if (heading?.id) {
+        onHeadingClick?.(heading.id)
+        return
+      }
+    }
+
+    container.addEventListener('click', handleClick)
+    return () => container.removeEventListener('click', handleClick)
+  }, [onWikilinkClick, onTaskToggle, onHeadingClick])
+
+  // ─── Empty State ─────────────────────────────────────────────────────
+
   if (!content.trim()) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -18,119 +235,14 @@ export function MarkdownPreview({ content, isDark, fontSize }: MarkdownPreviewPr
     )
   }
 
+  // ─── Render ──────────────────────────────────────────────────────────
+
   return (
     <div
-      className="markdown-preview h-full overflow-auto px-8 py-6"
+      ref={containerRef}
+      className={`markdown-preview h-full overflow-auto px-8 py-6 ${isDark ? 'dark-preview' : 'light-preview'}`}
       style={{ fontSize: `${fontSize}px` }}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          h1: ({ children }) => (
-            <h1 className="text-2xl font-bold tracking-tight mt-8 mb-4 first:mt-0 border-b border-border pb-3">
-              {children}
-            </h1>
-          ),
-          h2: ({ children }) => (
-            <h2 className="text-xl font-semibold tracking-tight mt-6 mb-3 first:mt-0">
-              {children}
-            </h2>
-          ),
-          h3: ({ children }) => (
-            <h3 className="text-lg font-semibold mt-5 mb-2 first:mt-0">
-              {children}
-            </h3>
-          ),
-          p: ({ children }) => (
-            <p className="leading-7 mb-4 last:mb-0">{children}</p>
-          ),
-          ul: ({ children }) => (
-            <ul className="list-disc pl-6 mb-4 space-y-1">{children}</ul>
-          ),
-          ol: ({ children }) => (
-            <ol className="list-decimal pl-6 mb-4 space-y-1">{children}</ol>
-          ),
-          li: ({ children }) => (
-            <li className="leading-7">{children}</li>
-          ),
-          blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-primary/30 pl-4 italic text-muted-foreground my-4">
-              {children}
-            </blockquote>
-          ),
-          code: ({ className, children, ...props }) => {
-            const isInline = !className
-            if (isInline) {
-              return (
-                <code
-                  className={isDark
-                    ? 'bg-white/10 rounded px-1.5 py-0.5 text-sm font-mono'
-                    : 'bg-black/5 rounded px-1.5 py-0.5 text-sm font-mono'
-                  }
-                  {...props}
-                >
-                  {children}
-                </code>
-              )
-            }
-            return (
-              <code className={`${className} block text-sm`} {...props}>
-                {children}
-              </code>
-            )
-          },
-          pre: ({ children }) => (
-            <pre
-              className={`rounded-lg p-4 overflow-x-auto my-4 text-sm ${
-                isDark ? 'bg-white/5' : 'bg-black/5'
-              }`}
-            >
-              {children}
-            </pre>
-          ),
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary underline underline-offset-4 hover:text-primary/80 transition-colors"
-            >
-              {children}
-            </a>
-          ),
-          hr: () => (
-            <hr className="my-6 border-border" />
-          ),
-          table: ({ children }) => (
-            <div className="overflow-x-auto my-4">
-              <table className="w-full border-collapse text-sm">
-                {children}
-              </table>
-            </div>
-          ),
-          thead: ({ children }) => (
-            <thead className={isDark ? 'bg-white/5' : 'bg-black/5'}>
-              {children}
-            </thead>
-          ),
-          th: ({ children }) => (
-            <th className="border border-border px-4 py-2 text-left font-semibold">
-              {children}
-            </th>
-          ),
-          td: ({ children }) => (
-            <td className="border border-border px-4 py-2">{children}</td>
-          ),
-          strong: ({ children }) => (
-            <strong className="font-bold">{children}</strong>
-          ),
-          em: ({ children }) => (
-            <em className="italic">{children}</em>
-          ),
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
+      dangerouslySetInnerHTML={{ __html: renderResult.html }}
+    />
   )
 }
