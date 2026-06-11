@@ -9,10 +9,11 @@
  * - codemirror-final-newline (yeliex) → Configurable trailing newline
  * - NEW: Slash commands via @codemirror/autocomplete
  * - NEW: Heading slug utilities (custom, no rendering)
+ * - NEW: Hybrid render — Obsidian-style Live Preview decorations
  *
  * Usage:
  * ```ts
- * import { toolbarPlugin, slashCommands, editorExtTheme, imageUpload, inlineSuggestion, finalNewline } from '@/lib/codemirror-ext'
+ * import { toolbarPlugin, slashCommands, editorExtTheme, imageUpload, inlineSuggestion, finalNewline, hybridRender } from '@/lib/codemirror-ext'
  * import { bold, italic, h1 } from '@/lib/codemirror-ext'
  * ```
  */
@@ -64,3 +65,6 @@ export {
 // Final newline
 export { finalNewline } from './final-newline'
 export type { FinalNewlineOptions } from './final-newline'
+
+// Hybrid render (Obsidian-style Live Preview decorations)
+export { hybridRender } from './hybrid-render'

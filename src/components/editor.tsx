@@ -38,6 +38,7 @@ import {
   imageUpload, createImageUploadCommand,
   finalNewline,
   formatDocument,
+  hybridRender,
 } from '@/lib/codemirror-ext'
 import { Toolbar } from '@/lib/codemirror-ext'
 
@@ -160,6 +161,9 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
       }),
       // Final newline (ensures doc ends with newline on focus change)
       finalNewline({ enabled: true, onFocusOnly: true }),
+      // Hybrid render — Obsidian-style Live Preview decorations
+      // (checkboxes, wikilinks, image thumbs, math, link styling)
+      hybridRender(),
       themeCompartment.of(isDark ? oneDark : []),
       fontSizeCompartment.of(EditorView.theme({
         '&': { fontSize: `${fontSize}px` },
