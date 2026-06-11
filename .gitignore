@@ -52,3 +52,22 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Database
+*.db
+*.db-journal
+
+# Download artifacts
+/download/
+
+# Worklog
+worklog.md
+
+# Examples
+/examples/
+
+# Caddyfile
+Caddyfile
+
+# Z-AI config
+.z-ai-config
