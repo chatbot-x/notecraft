@@ -14,7 +14,7 @@ import {
   Heading1, Heading2, Heading3, Heading4,
   List, ListOrdered, CheckSquare,
   Quote, Link, ImagePlus, Table, FileCode,
-  SeparatorHorizontal, Upload,
+  SeparatorHorizontal, Upload, Paintbrush,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ToolbarItemConfig, ToolbarItem } from './types'
@@ -24,6 +24,7 @@ import {
   h1, h2, h3, h4,
   blockquote, unorderedList, orderedList, todoList,
   link, image, codeBlock, horizontalRule, table,
+  formatDocument,
 } from '../commands'
 import { createImageUploadCommand } from '../image'
 
@@ -78,6 +79,8 @@ export const defaultToolbarItems: ToolbarItemConfig[] = [
   { key: 'codeblock', label: 'Code Block', icon: <FileCode className="h-3.5 w-3.5" />, command: codeBlock },
   { key: 'table', label: 'Insert Table', icon: <Table className="h-3.5 w-3.5" />, command: table },
   { key: 'hr', label: 'Horizontal Rule', icon: <SeparatorHorizontal className="h-3.5 w-3.5" />, command: horizontalRule },
+  { type: 'separator' },
+  { key: 'format', label: 'Format Document', icon: <Paintbrush className="h-3.5 w-3.5" />, command: formatDocument, shortcut: 'Ctrl+Shift+F' },
 ]
 
 // ─── Toolbar Button ───────────────────────────────────────────────────────────

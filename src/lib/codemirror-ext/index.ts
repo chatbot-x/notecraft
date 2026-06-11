@@ -27,9 +27,12 @@ export {
   blockquote, unorderedList, orderedList, todoList,
   // Insert commands
   link, image, codeBlock, horizontalRule, table,
+  // Document formatting
+  formatDocument, createFormatCommand,
   // List factory
   createList,
 } from './commands'
+export type { FormatDocumentOptions } from './commands'
 
 // Toolbar
 export { Toolbar, defaultToolbarItems } from './toolbar/component'

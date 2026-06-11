@@ -37,6 +37,7 @@ import {
   toolbarPlugin, slashCommands, editorExtTheme,
   imageUpload, createImageUploadCommand,
   finalNewline,
+  formatDocument,
 } from '@/lib/codemirror-ext'
 import { Toolbar } from '@/lib/codemirror-ext'
 
@@ -131,6 +132,9 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
         ...completionKeymap,
         ...lintKeymap,
         indentWithTab,
+        // Format document shortcut
+        { key: 'Ctrl-Shift-f', run: formatDocument },
+        { key: 'Cmd-Shift-f', run: formatDocument },
       ]),
       // Markdown language
       mdLang,

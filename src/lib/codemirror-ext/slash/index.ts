@@ -21,6 +21,7 @@ import {
   h1, h2, h3, h4,
   blockquote, unorderedList, orderedList, todoList,
   link, image, codeBlock, horizontalRule, table,
+  formatDocument,
 } from '../commands'
 import { createImageUploadCommand } from '../image'
 import { copyHeadingSlug, setHeadingSlug } from '../slug'
@@ -106,6 +107,9 @@ function buildSlashCommands(): SlashCommandOption[] {
     // Slug
     { label: 'Copy Heading Link', detail: 'Slug', keywords: ['slug', 'anchor', 'id', 'heading', 'link', 'copy'], apply: commandApply(copyHeadingSlug) },
     { label: 'Set Heading ID', detail: 'Slug', keywords: ['slug', 'anchor', 'id', 'heading', 'set'], apply: commandApply(setHeadingSlug) },
+
+    // Formatting
+    { label: 'Format Document', detail: 'Format', boost: 2, keywords: ['format', 'prettier', 'pretty', 'clean', 'organize', 'tidy'], apply: commandApply(formatDocument) },
   ]
 }
 

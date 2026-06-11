@@ -8,10 +8,12 @@
  * - Code inline/block commands
  * - Horizontal rule command
  * - Improved heading cycling
+ * - Document formatting via Prettier (built-in markdown parser)
  */
 
 import { EditorSelection, type ChangeSpec } from '@codemirror/state'
 import type { Command } from '@codemirror/view'
+import * as prettier from 'prettier'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -363,4 +365,154 @@ export const horizontalRule: Command = (view) => insertText('\n---\n', view, 5)
 export const table: Command = (view) => {
   const template = '\n| Header | Header |\n| ------ | ------ |\n| Cell   | Cell   |\n'
   return insertText(template, view, 2)
+}
+
+// ─── Document Formatting ─────────────────────────────────────────────────────
+
+export interface FormatDocumentOptions {
+  /** Print width for formatting (default: 80) */
+  printWidth?: number
+  /** Use single quotes where possible (default: false) */
+  singleQuote?: boolean
+  /** Prose wrapping mode: 'always' | 'never' | 'preserve' (default: 'preserve') */
+  proseWrap?: 'always' | 'never' | 'preserve'
+}
+
+/**
+ * Format the entire markdown document using Prettier's built-in markdown parser.
+ * No additional plugins needed — Prettier 3.x includes markdown support natively.
+ *
+ * What Prettier's markdown formatter does:
+ * - Normalizes whitespace and line breaks
+ * - Pads Markdown tables with alignment spaces
+ * - Standardizes list markers (1. → 1.)
+ * - Removes trailing whitespace
+ * - Adds/removes blank lines between blocks per CommonMark spec
+ * - Normalizes code block language identifiers
+ * - Consistent indentation in nested structures
+ * - Preserves the meaning of your content (pure formatting, no rewriting)
+ *
+ * Usage:
+ * ```ts
+ * import { formatDocument } from '@/lib/codemirror-ext'
+ *
+ * // As a keyboard shortcut
+ * keymap.of([{ key: 'Ctrl+Shift+F', run: formatDocument }])
+ *
+ * // Or call directly
+ * formatDocument(view)
+ * ```
+ */
+export const formatDocument: Command = (view): boolean => {
+  const { state } = view
+  const content = state.doc.toString()
+  const cursorPos = state.selection.main.head
+
+  // Track the line the cursor is on before formatting
+  const cursorLine = state.doc.lineAt(cursorPos)
+  const cursorLineText = cursorLine.text
+  const cursorColumn = cursorPos - cursorLine.from
+
+  // Prettier v3 returns a Promise — fire and forget
+  prettier.format(content, {
+    parser: 'markdown',
+    printWidth: 80,
+    proseWrap: 'preserve',
+  }).then((formatted) => {
+    // If nothing changed, skip
+    if (formatted === content) {
+      view.focus()
+      return
+    }
+
+    // Find the line that best matches the cursor's original line
+    const lines = formatted.split('\n')
+    let bestLine = Math.min(cursorLine.number - 1, lines.length - 1)
+    if (cursorLineText.trim()) {
+      const searchStart = Math.max(0, cursorLine.number - 3)
+      const searchEnd = Math.min(lines.length, cursorLine.number + 3)
+      for (let i = searchStart; i < searchEnd; i++) {
+        if (lines[i] && lines[i].includes(cursorLineText.trim().slice(0, 30))) {
+          bestLine = i
+          break
+        }
+      }
+    }
+
+    // Replace the entire document with formatted content
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: formatted },
+      // Restore cursor to the matching line and column
+      selection: (() => {
+        const targetLine = bestLine + 1
+        const totalLines = view.state.doc.lines
+        const linePos = view.state.doc.line(targetLine > totalLines ? totalLines : targetLine)
+        const col = Math.min(cursorColumn, linePos.text.length)
+        return EditorSelection.cursor(linePos.from + col)
+      })(),
+    })
+
+    view.focus()
+  }).catch((err) => {
+    console.warn('Markdown formatting failed:', err)
+    view.focus()
+  })
+
+  return true
+}
+
+/**
+ * Create a formatDocument command with custom Prettier options.
+ */
+export function createFormatCommand(options: FormatDocumentOptions): Command {
+  return (view): boolean => {
+    const { state } = view
+    const content = state.doc.toString()
+    const cursorPos = state.selection.main.head
+    const cursorLine = state.doc.lineAt(cursorPos)
+    const cursorLineText = cursorLine.text
+    const cursorColumn = cursorPos - cursorLine.from
+
+    prettier.format(content, {
+      parser: 'markdown',
+      printWidth: options.printWidth ?? 80,
+      proseWrap: options.proseWrap ?? 'preserve',
+    }).then((formatted) => {
+      if (formatted === content) {
+        view.focus()
+        return
+      }
+
+      const lines = formatted.split('\n')
+      let bestLine = Math.min(cursorLine.number - 1, lines.length - 1)
+      if (cursorLineText.trim()) {
+        const searchStart = Math.max(0, cursorLine.number - 3)
+        const searchEnd = Math.min(lines.length, cursorLine.number + 3)
+        for (let i = searchStart; i < searchEnd; i++) {
+          if (lines[i] && lines[i].includes(cursorLineText.trim().slice(0, 30))) {
+            bestLine = i
+            break
+          }
+        }
+      }
+
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: formatted },
+        selection: (() => {
+          const targetLine = bestLine + 1
+          const totalLines = view.state.doc.lines
+          const linePos = view.state.doc.line(targetLine > totalLines ? totalLines : targetLine)
+          const col = Math.min(cursorColumn, linePos.text.length)
+          return EditorSelection.cursor(linePos.from + col)
+        })(),
+      })
+
+      view.focus()
+    }).catch((err) => {
+      console.warn('Markdown formatting failed:', err)
+      view.focus()
+    })
+
+    return true
+  }
 }
