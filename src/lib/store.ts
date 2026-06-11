@@ -170,7 +170,7 @@ This text is visible. %%This text is hidden in the preview%% And this is also vi
 | Math Rendering | KaTeX | Active |
 | Diagrams | Mermaid | Active |
 | Callouts | Custom Plugin | Active |
-| Wikilinks | markdown-it-wikilinks | Active |
+| Wikilinks | Custom Plugin | Active |
 | Emoji | markdown-it-emoji | Active |
 | Def Lists | markdown-it-deflist | Active |
 | Front Matter | markdown-it-front-matter | Active |

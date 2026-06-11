@@ -43,7 +43,7 @@
 
 import MarkdownIt from 'markdown-it'
 import katex from '@traptitech/markdown-it-katex'
-import wikilinks from 'markdown-it-wikilinks'
+import wikilinks from './wikilink-plugin'
 import footnote from 'markdown-it-footnote'
 import taskLists from 'markdown-it-task-lists'
 import sub from 'markdown-it-sub'
@@ -314,13 +314,6 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     md.use(wikilinks, {
       baseURL: wikilinkBase,
       uriSuffix: '',
-      makeAllLinkAbsolute: false,
-      linkPattern: /\[\[([^\x00-\x1F|]+?)(\|[^\x00-\x1F|]+?)?\]\]/,
-      generatePageNameFromLabel: (label: string) => {
-        // For [[note#heading]], extract just the page name
-        // but preserve # in the label for href generation
-        return label.trim()
-      },
     })
   }
 
