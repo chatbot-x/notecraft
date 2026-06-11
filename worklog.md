@@ -1,23 +1,25 @@
 ---
 Task ID: 1
-Agent: Main Agent
-Task: Refine NoteCraft UX with polished interactions
+Agent: Super Z (main)
+Task: Create custom all-in-one CodeMirror 6 extension package (codemirror-ext) based on yeliex packages
 
 Work Log:
-- Enhanced Zustand store with viewMode, fontSize, saveStatus, commandPaletteOpen, duplicateNote
-- Added welcome note that appears on first visit with keyboard shortcut reference
-- Built CodeMirror 6 editor with save indicator (debounced: saving → saved → idle)
-- Added font size compartment for dynamic font size changes
-- Added markdown heading/font styling in CodeMirror theme
-- Built MarkdownPreview component with react-markdown + remark-gfm for GFM tables
-- Built CommandPalette with search, keyboard navigation, categories (Actions/Notes/View)
-- Rebuilt Sidebar with better UX: active note ring highlight, duplicate button, clear search button, animated list items, command palette shortcut in footer, tooltips on all buttons
-- Rebuilt NoteApp with: view mode switcher (edit/preview/split), font size controls, save indicator, word/line count, theme toggle with tooltip, global keyboard shortcuts (Ctrl+N/B/K/\/+/-), animated empty state with shortcut hints
-- Added custom CSS for markdown preview scrollbar, selection colors, focus rings
-- Verified all features work with Agent Browser: welcome note, editor, preview, split, command palette, note creation, note switching, dark mode
+- Examined yeliex/codemirror-toolbar source: ViewPlugin-based DOM toolbar with static HTML buttons
+- Examined yeliex/codemirror-markdown-commands source: bold, italic, strike, underline, heading, list, quote, link, image commands
+- Designed codemirror-ext package structure: commands/, toolbar/, slash/, theme/
+- Implemented enhanced markdown commands with toggle support (wrap/unwrap), smart cursor placement
+- Added new commands not in yeliex: inlineCode, highlight, codeBlock, horizontalRule, table
+- Built React-based toolbar using createPortal into CM6's toolbar container (much richer UI than yeliex's DOM-only approach)
+- Built Notion-style slash commands using @codemirror/autocomplete with 19 categorized options
+- Created theme extension for toolbar and autocomplete styling
+- Integrated all extensions into the NoteCraft editor component
+- Fixed TypeScript errors: Completion.apply signature, Highlighter import, unused refs
+- Enhanced globals.css with autocomplete dropdown styling for slash commands
+- Verified toolbar renders correctly with all 19 buttons in browser
 
 Stage Summary:
-- Fully polished UX with command palette, view modes, keyboard shortcuts, animations
-- Key new files: /src/components/command-palette.tsx, /src/components/markdown-preview.tsx
-- Key updated files: /src/lib/store.ts, /src/components/editor.tsx, /src/components/sidebar.tsx, /src/components/note-app.tsx
-- Screenshots saved to /home/z/my-project/download/
+- Created /src/lib/codemirror-ext/ package with 4 modules: commands, toolbar, slash, theme
+- Commands: 17 markdown editing commands (6 inline, 4 heading, 4 list, 3 block, 4 insert)
+- Toolbar: 19 buttons with Lucide icons, tooltips, and keyboard shortcut hints
+- Slash commands: 19 options across 4 categories (Text, Heading, List, Insert) triggered by `/`
+- All TypeScript clean, no runtime errors, toolbar verified in browser

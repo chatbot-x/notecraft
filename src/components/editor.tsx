@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import { EditorState, Extension, Compartment } from '@codemirror/state'
 import {
   EditorView,
@@ -26,7 +26,6 @@ import {
   codeFolding,
 } from '@codemirror/language'
 import {
-  autocompletion,
   completionKeymap,
   closeBrackets,
   closeBracketsKeymap,
@@ -34,6 +33,8 @@ import {
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { lintKeymap } from '@codemirror/lint'
 import { useNotesStore } from '@/lib/store'
+import { toolbarPlugin, slashCommands, editorExtTheme } from '@/lib/codemirror-ext'
+import { Toolbar } from '@/lib/codemirror-ext'
 
 const themeCompartment = new Compartment()
 const fontSizeCompartment = new Compartment()
@@ -52,6 +53,7 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
   const isUpdatingRef = useRef(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const updateNote = useNotesStore((s) => s.updateNote)
+  const [editorView, setEditorView] = useState<EditorView | null>(null)
 
   const getExtensions = useCallback((): Extension[] => {
     return [
@@ -59,18 +61,15 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
       highlightActiveLineGutter(),
       highlightSpecialChars(),
       history(),
-      foldGutter({
-        gutterDOMClass: 'cm-fold-gutter',
-      }),
+      foldGutter(),
       drawSelection(),
       codeFolding(),
       indentOnInput(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       bracketMatching(),
       closeBrackets(),
-      autocompletion({
-        icons: false,
-      }),
+      // Slash commands (Notion-style "/" menu)
+      slashCommands(),
       rectangularSelection(),
       crosshairCursor(),
       highlightActiveLine(),
@@ -86,6 +85,10 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
         indentWithTab,
       ]),
       markdown({ base: markdownLanguage }),
+      // Toolbar plugin (creates container for React portal)
+      toolbarPlugin,
+      // Theme for toolbar + slash command styling
+      editorExtTheme,
       themeCompartment.of(isDark ? oneDark : []),
       fontSizeCompartment.of(EditorView.theme({
         '&': { fontSize: `${fontSize}px` },
@@ -216,10 +219,12 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
     })
 
     viewRef.current = view
+    setEditorView(view)
 
     return () => {
       view.destroy()
       viewRef.current = null
+      setEditorView(null)
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     }
   }, [noteId])
@@ -259,9 +264,13 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
   }, [noteId, initialValue])
 
   return (
-    <div
-      ref={editorRef}
-      className="h-full w-full codemirror-editor"
-    />
+    <div className="h-full w-full flex flex-col codemirror-editor">
+      {/* Toolbar rendered via React portal into CM6's toolbar container */}
+      <Toolbar view={editorView} />
+      <div
+        ref={editorRef}
+        className="flex-1 overflow-hidden"
+      />
+    </div>
   )
 }
