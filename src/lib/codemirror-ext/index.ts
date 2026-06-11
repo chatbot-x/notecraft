@@ -32,13 +32,15 @@ export {
   formatDocument, createFormatCommand,
   // List factory
   createList,
+  // Callout commands
+  createCallout,
 } from './commands'
 export type { FormatDocumentOptions } from './commands'
 
 // Toolbar
 export { Toolbar, defaultToolbarItems } from './toolbar/component'
 export { toolbarPlugin, getToolbarContainer, executeToolbarCommand } from './toolbar/plugin'
-export type { ToolbarItem, ToolbarItemConfig, ToolbarSeparator, ToolbarSpacer, ToolbarGroup } from './toolbar/types'
+export type { ToolbarItem, ToolbarItemConfig, ToolbarSeparator, ToolbarSpacer, ToolbarGroup, ToolbarDropdown, ToolbarDropdownItem } from './toolbar/types'
 
 // Slash commands
 export { slashCommands, registerSlashCommands } from './slash'

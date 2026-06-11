@@ -361,6 +361,51 @@ export const codeBlock: Command = (view) => {
 /** Insert a horizontal rule: --- */
 export const horizontalRule: Command = (view) => insertText('\n---\n', view, 5)
 
+// ─── Callout Commands ──────────────────────────────────────────────────────────
+
+/**
+ * Create a command that inserts an Obsidian-style callout block.
+ *
+ * Inserts the syntax:
+ *   > [!type] Title
+ *   >
+ *
+ * For foldable callouts, use `callout('note', { foldable: true, defaultOpen: true })`
+ * which inserts:
+ *   > [!note]+ Title
+ *   >
+ */
+export function createCallout(
+  type: string,
+  options?: { title?: string; foldable?: boolean; defaultOpen?: boolean },
+): Command {
+  const title = options?.title ?? type.charAt(0).toUpperCase() + type.slice(1)
+  const foldMarker = options?.foldable
+    ? options.defaultOpen
+      ? '+'
+      : '-'
+    : ''
+
+  return (view) => {
+    const { state } = view
+    const main = state.selection.main
+    const selectedText = state.sliceDoc(main.from, main.to)
+
+    // If text is selected, use it as the callout body
+    if (selectedText) {
+      const lines = selectedText.split('\n')
+      const bodyLines = lines.map((l) => `> ${l}`).join('\n')
+      const text = `\n> [!${type}]${foldMarker} ${title}\n${bodyLines}\n`
+      return insertText(text, view, text.length)
+    }
+
+    // No selection — insert a callout template
+    const text = `\n> [!${type}]${foldMarker} ${title}\n> \n`
+    // Place cursor on the empty content line (2 chars from end: '> ')
+    return insertText(text, view, text.length - 1)
+  }
+}
+
 /** Insert a table template */
 export const table: Command = (view) => {
   const template = '\n| Header | Header |\n| ------ | ------ |\n| Cell   | Cell   |\n'

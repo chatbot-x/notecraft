@@ -47,7 +47,6 @@ import mark from 'markdown-it-mark'
 import attrs from 'markdown-it-attrs'
 import { full as emojiFull } from 'markdown-it-emoji'
 import deflist from 'markdown-it-deflist'
-// @ts-expect-error — CJS module with no default export
 import frontMatter from 'markdown-it-front-matter'
 
 // DOMPurify — browser-only sanitization.
