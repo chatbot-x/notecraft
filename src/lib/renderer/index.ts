@@ -35,7 +35,20 @@ import sub from 'markdown-it-sub'
 import sup from 'markdown-it-sup'
 import mark from 'markdown-it-mark'
 import attrs from 'markdown-it-attrs'
-import DOMPurify from 'isomorphic-dompurify'
+// DOMPurify — browser-only sanitization.
+// Since the preview component is client-only (ssr: false), DOMPurify is
+// only ever invoked in the browser. We use a lazy init pattern to avoid
+// requiring jsdom on the server (which breaks Cloudflare Workers).
+let _dompurify: typeof import('dompurify').default | null = null
+
+function getPurify() {
+  if (!_dompurify) {
+    // DOMPurify requires a `window` object — only available in the browser.
+    // The isomorphic version pulls in jsdom which doesn't work on edge runtimes.
+    _dompurify = require('dompurify')
+  }
+  return _dompurify
+}
 import mermaidPlugin from './mermaid-plugin'
 import calloutPlugin from './callout-plugin'
 import headingIdPlugin from './heading-id-plugin'
@@ -249,6 +262,7 @@ function extractHeadings(html: string): Array<{ id: string; text: string; level:
 // ─── Sanitize HTML ────────────────────────────────────────────────────────────
 
 function sanitizeHtml(html: string): string {
+  const DOMPurify = getPurify()
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
