@@ -10,7 +10,15 @@
  * Optionally shows a subtle indicator dot at the comment position so the user
  * knows something is there (matching Obsidian's behavior).
  *
- * Uses regex scanning since the lezer parser doesn't understand %%...%% syntax.
+ * ## Level 2: Tree-based scanning
+ *
+ * With the Lezer Comment extension active, the syntax tree contains `Comment`,
+ * `CommentMark`, and `CommentContent` nodes. This plugin now scans the tree
+ * instead of using regex, which eliminates false positives inside code blocks
+ * and provides incremental parsing benefits.
+ *
+ * Falls back to regex scanning if the tree doesn't contain Comment nodes
+ * (e.g., if the Lezer extension is not loaded).
  */
 
 import {
@@ -22,6 +30,7 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import type { Range } from '@codemirror/state'
+import { syntaxTree } from '@codemirror/language'
 import {
   activeMark,
   isCursorInRange,
@@ -57,13 +66,47 @@ class CommentIndicatorWidget extends WidgetType {
   }
 }
 
-// ─── Build Decorations ────────────────────────────────────────────────────────
+// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
 
 function buildCommentDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
   const state = view.state
-  const doc = state.doc
 
+  // Try tree-based scanning first
+  const tree = syntaxTree(state)
+  let usedTree = false
+
+  for (const { from, to } of view.visibleRanges) {
+    tree.iterate({
+      from,
+      to,
+      enter(node) {
+        if (node.name === 'Comment') {
+          usedTree = true
+          const start = node.from
+          const end = node.to
+
+          if (isCursorInRange(state, start, end)) {
+            // Cursor inside — show raw syntax with active highlighting
+            ranges.push(activeMark.range(start, end))
+          } else {
+            // Hide the entire %%...%% and show a subtle indicator dot
+            ranges.push(
+              Decoration.replace({
+                widget: new CommentIndicatorWidget(),
+              }).range(start, end)
+            )
+          }
+        }
+      },
+    })
+  }
+
+  // If tree had Comment nodes, we're done
+  if (usedTree) return Decoration.set(ranges, true)
+
+  // ── Fallback: regex scanning (if Lezer extension not loaded) ─────────────
+  const doc = state.doc
   for (const { from, to } of view.visibleRanges) {
     const skipRanges = collectSkipRanges(state, from, to)
     const visibleText = doc.sliceString(from, to)
@@ -79,12 +122,10 @@ function buildCommentDecorations(view: EditorView): DecorationSet {
       if (isInRangeList(start, end, skipRanges)) continue
 
       if (isCursorInRange(state, start, end)) {
-        // Cursor inside — show raw syntax with active highlighting
         ranges.push(activeMark.range(start, end))
         continue
       }
 
-      // Hide the entire %%...%% and show a subtle indicator dot
       ranges.push(
         Decoration.replace({
           widget: new CommentIndicatorWidget(),

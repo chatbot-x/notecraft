@@ -13,7 +13,14 @@
  *
  * Image embeds (![[image.png|300]]) are handled by the wikilinks plugin.
  *
- * Uses regex scanning since the lezer parser doesn't understand ![[...]] syntax.
+ * ## Level 2: Tree-based scanning
+ *
+ * With the Lezer Embed extension active, the syntax tree contains `Embed`,
+ * `EmbedMark`, and `EmbedTarget` nodes. This plugin now scans the tree
+ * for Embed nodes where the target is NOT an image path, and replaces them
+ * with transclusion widgets.
+ *
+ * Falls back to regex scanning if the tree doesn't contain Embed nodes.
  */
 
 import {
@@ -25,29 +32,16 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import type { Range } from '@codemirror/state'
+import { syntaxTree } from '@codemirror/language'
 import {
   activeMark,
+  isImagePath,
   EMBED_TRANSCLUDE_RE,
   isCursorInRange,
   collectSkipRanges,
   isInRangeList,
 } from './shared'
 import { checkUpdateAction } from './drag-state'
-
-// ─── Image Extensions ─────────────────────────────────────────────────────────
-
-const IMAGE_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp',
-  '.bmp', '.ico', '.avif', '.tiff', '.tif',
-])
-
-function isImagePath(filename: string): boolean {
-  const lower = filename.toLowerCase()
-  for (const ext of IMAGE_EXTENSIONS) {
-    if (lower.endsWith(ext)) return true
-  }
-  return false
-}
 
 // ─── Widget: Embed Transclusion ───────────────────────────────────────────────
 
@@ -147,13 +141,65 @@ function parseEmbedTarget(target: string): EmbedTarget {
   return { noteName: target }
 }
 
-// ─── Build Decorations ────────────────────────────────────────────────────────
+// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
 
 function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
   const state = view.state
-  const doc = state.doc
 
+  // Try tree-based scanning first
+  const tree = syntaxTree(state)
+  let usedTree = false
+
+  for (const { from, to } of view.visibleRanges) {
+    tree.iterate({
+      from,
+      to,
+      enter(node) {
+        if (node.name === 'Embed') {
+          // Extract the target text from EmbedTarget child
+          let targetText = ''
+          node.node.cursor().iterate((child) => {
+            if (child.name === 'EmbedTarget') {
+              targetText = state.doc.sliceString(child.from, child.to)
+            }
+            return false
+          })
+
+          // Parse the | separator for label/size
+          const pipeIdx = targetText.indexOf('|')
+          const filePath = pipeIdx > -1 ? targetText.slice(0, pipeIdx) : targetText
+          const label = pipeIdx > -1 ? targetText.slice(pipeIdx + 1) : undefined
+
+          // Skip image embeds — handled by wikilinks plugin
+          if (isImagePath(filePath)) return
+
+          usedTree = true
+          const start = node.from
+          const end = node.to
+
+          if (isCursorInRange(state, start, end)) {
+            ranges.push(activeMark.range(start, end))
+            return
+          }
+
+          // Replace the embed syntax with a transclusion widget
+          ranges.push(
+            Decoration.replace({
+              widget: new EmbedTransclusionWidget(filePath, label),
+              block: true,
+            }).range(start, end)
+          )
+        }
+      },
+    })
+  }
+
+  // If tree had Embed nodes, we're done
+  if (usedTree) return Decoration.set(ranges, true)
+
+  // ── Fallback: regex scanning (if Lezer extension not loaded) ─────────────
+  const doc = state.doc
   for (const { from, to } of view.visibleRanges) {
     const skipRanges = collectSkipRanges(state, from, to)
     const visibleText = doc.sliceString(from, to)
@@ -167,10 +213,8 @@ function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
       const target = match[1]
       const label = match[2]
 
-      // Skip if inside code block or inline code
       if (isInRangeList(start, end, skipRanges)) continue
 
-      // Skip image embeds — handled by wikilinks plugin
       if (isImagePath(target)) continue
 
       if (isCursorInRange(state, start, end)) {
@@ -178,7 +222,6 @@ function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
         continue
       }
 
-      // Replace the embed syntax with a transclusion widget
       ranges.push(
         Decoration.replace({
           widget: new EmbedTransclusionWidget(target, label),

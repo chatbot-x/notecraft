@@ -9,7 +9,14 @@
  *
  * When the cursor is on the line, the raw ^id is shown normally.
  *
- * Uses regex scanning since the lezer parser doesn't understand ^block-id syntax.
+ * ## Level 2: Tree-based scanning
+ *
+ * With the Lezer BlockRef extension active, the syntax tree contains `BlockRef`,
+ * `BlockRefMark`, and `BlockRefId` nodes. This plugin now scans the tree
+ * instead of using regex, which eliminates false positives inside code blocks
+ * and provides incremental parsing benefits.
+ *
+ * Falls back to regex scanning if the tree doesn't contain BlockRef nodes.
  */
 
 import {
@@ -20,6 +27,7 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import type { Range } from '@codemirror/state'
+import { syntaxTree } from '@codemirror/language'
 import {
   blockRefMark,
   fadedMark,
@@ -30,13 +38,63 @@ import {
 } from './shared'
 import { checkUpdateAction } from './drag-state'
 
-// ─── Build Decorations ────────────────────────────────────────────────────────
+// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
 
 function buildBlockRefDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
   const state = view.state
-  const doc = state.doc
 
+  // Try tree-based scanning first
+  const tree = syntaxTree(state)
+  let usedTree = false
+
+  for (const { from, to } of view.visibleRanges) {
+    tree.iterate({
+      from,
+      to,
+      enter(node) {
+        if (node.name === 'BlockRef') {
+          usedTree = true
+          const start = node.from
+          const end = node.to
+
+          const line = state.doc.lineAt(start)
+
+          // Skip if cursor is on this line (show raw syntax)
+          if (isCursorOnLine(state, line.from, line.to)) return
+
+          // Find child nodes: BlockRefMark(^) and BlockRefId(id)
+          let markFrom = start
+          let markTo = start + 1
+          let idFrom = start + 1
+          let idTo = end
+
+          // Iterate children to find exact positions
+          node.node.cursor().iterate((child) => {
+            if (child.name === 'BlockRefMark') {
+              markFrom = child.from
+              markTo = child.to
+            }
+            if (child.name === 'BlockRefId') {
+              idFrom = child.from
+              idTo = child.to
+            }
+            return false // don't descend
+          })
+
+          // Style the ^ as faded, and the block-id as a badge
+          ranges.push(fadedMark.range(markFrom, markTo))
+          ranges.push(blockRefMark.range(idFrom, idTo))
+        }
+      },
+    })
+  }
+
+  // If tree had BlockRef nodes, we're done
+  if (usedTree) return Decoration.set(ranges, true)
+
+  // ── Fallback: regex scanning (if Lezer extension not loaded) ─────────────
+  const doc = state.doc
   for (const { from, to } of view.visibleRanges) {
     const skipRanges = collectSkipRanges(state, from, to)
     const visibleText = doc.sliceString(from, to)
@@ -46,21 +104,15 @@ function buildBlockRefDecorations(view: EditorView): DecorationSet {
 
     while ((match = BLOCK_REF_RE.exec(visibleText)) !== null) {
       const blockId = match[1]
-      // Calculate the position of the ^ character
-      // match[0] may include a leading space/newline
       const leadingLen = match[0].length - 1 - blockId.length
       const caretPos = from + match.index + leadingLen
-      const idEnd = caretPos + 1 + blockId.length // includes the ^
+      const idEnd = caretPos + 1 + blockId.length
 
-      // Skip if inside code block or inline code
       if (isInRangeList(caretPos, idEnd, skipRanges)) continue
 
       const line = doc.lineAt(caretPos)
-
-      // Skip if cursor is on this line (show raw syntax)
       if (isCursorOnLine(state, line.from, line.to)) continue
 
-      // Style the ^ as faded, and the block-id as a badge
       ranges.push(fadedMark.range(caretPos, caretPos + 1))
       ranges.push(blockRefMark.range(caretPos + 1, idEnd))
     }

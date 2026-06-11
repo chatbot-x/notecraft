@@ -34,38 +34,8 @@ import {
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
-import { hiddenMark, isCursorInRange } from './shared'
+import { hiddenMark, isCursorInRange, CALLOUT_TYPES, TYPE_ALIASES } from './shared'
 import { checkUpdateAction } from './drag-state'
-
-// ─── Callout Type Colors (shared with callouts.ts) ────────────────────────────
-
-const CALLOUT_TYPES: Record<string, { color: string }> = {
-  note:      { color: '#448aff' },
-  info:      { color: '#448aff' },
-  tip:       { color: '#00c853' },
-  success:   { color: '#00c853' },
-  question:  { color: '#ffab00' },
-  warning:   { color: '#ff9100' },
-  failure:   { color: '#ff5252' },
-  danger:    { color: '#ff1744' },
-  bug:       { color: '#e040fb' },
-  example:   { color: '#7c4dff' },
-  quote:     { color: '#9e9e9e' },
-  abstract:  { color: '#00b8d4' },
-  todo:      { color: '#448aff' },
-  important: { color: '#ff9100' },
-}
-
-const TYPE_ALIASES: Record<string, string> = {
-  summary: 'abstract', tldr: 'abstract',
-  hint: 'tip',
-  check: 'success', done: 'success',
-  help: 'question', faq: 'question',
-  caution: 'warning', attention: 'warning',
-  fail: 'failure', missing: 'failure',
-  error: 'danger',
-  cite: 'quote',
-}
 
 // ─── Build Decorations ────────────────────────────────────────────────────────
 

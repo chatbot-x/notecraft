@@ -16,6 +16,7 @@ import {
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { obsidianExtensions } from '@/lib/codemirror-ext'
 import {
   syntaxHighlighting,
   defaultHighlightStyle,
@@ -103,8 +104,11 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
   const [editorView, setEditorView] = useState<EditorView | null>(null)
 
   const getExtensions = useCallback((): Extension[] => {
-    // Markdown language with GFM support
-    const mdLang = markdown({ base: markdownLanguage })
+    // Markdown language with GFM support + Obsidian Lezer extensions
+    const mdLang = markdown({
+      base: markdownLanguage,
+      extensions: obsidianExtensions,
+    })
 
     return [
       lineNumbers(),

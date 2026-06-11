@@ -11,12 +11,15 @@
  * changes the vertical block structure. Block-changing decorations MUST be
  * provided via StateField for correct viewport computation.
  *
- * ## How it works
+ * ## Level 2: Tree-based frontmatter detection
  *
- * 1. Detects `---` delimiters at the start of the document (frontmatter)
- * 2. Replaces the entire frontmatter block with a collapsed widget
- * 3. When cursor enters the frontmatter range, shows raw YAML
- * 4. Click the toggle to expand/collapse
+ * With the Lezer Frontmatter extension active, the syntax tree contains
+ * `Frontmatter`, `FrontmatterMark`, and `FrontmatterContent` nodes. This
+ * plugin now uses the tree to detect frontmatter instead of manual regex
+ * line-by-line scanning, which is more reliable and benefits from incremental
+ * parsing.
+ *
+ * Falls back to regex scanning if the tree doesn't contain Frontmatter nodes.
  */
 
 import {
@@ -26,6 +29,7 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { StateField, StateEffect, type Range, type Transaction } from '@codemirror/state'
+import { syntaxTree } from '@codemirror/language'
 import { isCursorInRange } from './shared'
 import { dragSelectingField } from './drag-state'
 
@@ -109,7 +113,20 @@ class ExpandedFrontmatterWidget extends WidgetType {
   }
 }
 
-// ─── Parse Frontmatter ────────────────────────────────────────────────────────
+// ─── Parse Frontmatter Keys ──────────────────────────────────────────────────
+
+function parseFrontmatterKeys(state: import('@codemirror/state').EditorState, from: number, to: number): string[] {
+  const yamlText = state.doc.sliceString(from, to)
+  const keys: string[] = []
+  const keyRe = /^(\w[\w-]*)\s*:/gm
+  let keyMatch: RegExpExecArray | null
+  while ((keyMatch = keyRe.exec(yamlText)) !== null) {
+    keys.push(keyMatch[1])
+  }
+  return keys
+}
+
+// ─── Find Frontmatter (Tree-based) ───────────────────────────────────────────
 
 interface FrontmatterInfo {
   from: number
@@ -118,16 +135,48 @@ interface FrontmatterInfo {
 }
 
 function findFrontmatter(state: import('@codemirror/state').EditorState): FrontmatterInfo | null {
+  // Try tree-based detection first
+  const tree = syntaxTree(state)
+  let fmInfo: FrontmatterInfo | null = null
+
+  tree.iterate({
+    from: 0,
+    to: Math.min(state.doc.length, 5000), // frontmatter is always near doc start
+    enter(node) {
+      if (node.name === 'Frontmatter') {
+        const from = node.from
+        const to = node.to
+
+        // Find FrontmatterContent child to extract keys
+        let contentFrom = from + 3 // after opening ---
+        let contentTo = to - 3 // before closing ---
+
+        node.node.cursor().iterate((child) => {
+          if (child.name === 'FrontmatterContent') {
+            contentFrom = child.from
+            contentTo = child.to
+          }
+          return false
+        })
+
+        const keys = parseFrontmatterKeys(state, contentFrom, contentTo)
+        fmInfo = { from, to, keys }
+        return // stop iterating
+      }
+    },
+  })
+
+  if (fmInfo) return fmInfo
+
+  // ── Fallback: regex line-by-line scanning ─────────────────────────────────
   const doc = state.doc
   if (doc.length === 0) return null
 
   const firstLine = doc.line(1)
   const firstLineText = firstLine.text.trimEnd()
 
-  // Must start with ---
   if (firstLineText !== '---') return null
 
-  // Find closing ---
   let endLine = -1
   for (let i = 2; i <= doc.lines; i++) {
     const line = doc.line(i)
@@ -135,7 +184,6 @@ function findFrontmatter(state: import('@codemirror/state').EditorState): Frontm
       endLine = i
       break
     }
-    // Don't search too far (frontmatter shouldn't be huge)
     if (i > 100) break
   }
 
@@ -145,15 +193,7 @@ function findFrontmatter(state: import('@codemirror/state').EditorState): Frontm
   const from = firstLine.from
   const to = endLineObj.to
 
-  // Parse keys from the YAML (simple regex, not a full YAML parser)
-  const yamlText = doc.sliceString(from, to)
-  const keys: string[] = []
-  const keyRe = /^(\w[\w-]*)\s*:/gm
-  let keyMatch: RegExpExecArray | null
-  while ((keyMatch = keyRe.exec(yamlText)) !== null) {
-    keys.push(keyMatch[1])
-  }
-
+  const keys = parseFrontmatterKeys(state, from, to)
   return { from, to, keys }
 }
 
@@ -170,7 +210,6 @@ function buildFrontmatterDecorations(
 
   // If cursor is inside the frontmatter, show it raw
   if (isCursorInRange(state, fm.from, fm.to)) {
-    // Just add a line decoration to mark it as frontmatter
     const firstLine = state.doc.lineAt(fm.from)
     ranges.push(
       Decoration.line({
@@ -186,10 +225,9 @@ function buildFrontmatterDecorations(
       Decoration.widget({
         widget: new ExpandedFrontmatterWidget(fm.keys.length),
         block: true,
-        side: -1, // Before the position
+        side: -1,
       }).range(fm.from)
     )
-    // Don't hide the YAML — it's visible in expanded mode
     // Add line decorations to all frontmatter lines
     for (let pos = fm.from; pos <= fm.to; ) {
       const line = state.doc.lineAt(pos)
@@ -206,7 +244,7 @@ function buildFrontmatterDecorations(
       Decoration.replace({
         widget: new CollapsedFrontmatterWidget(fm.keys.length, fm.keys.slice(0, 3)),
         block: true,
-      }).range(fm.from, fm.to + 1) // +1 to include the trailing newline
+      }).range(fm.from, fm.to + 1)
     )
   }
 

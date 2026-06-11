@@ -81,6 +81,53 @@ export function isInRangeList(
   return false
 }
 
+// ─── Shared Constants ────────────────────────────────────────────────────────
+
+/** Known image file extensions for embed detection */
+export const IMAGE_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp',
+  '.bmp', '.ico', '.avif', '.tiff', '.tif',
+])
+
+/** Check if a filename has a known image extension */
+export function isImagePath(filename: string): boolean {
+  const lower = filename.toLowerCase()
+  for (const ext of IMAGE_EXTENSIONS) {
+    if (lower.endsWith(ext)) return true
+  }
+  return false
+}
+
+/** Callout type definitions with colors and icons */
+export const CALLOUT_TYPES: Record<string, { color: string; icon: string }> = {
+  note:      { color: '#448aff', icon: '\u270E' },
+  info:      { color: '#448aff', icon: '\u2139' },
+  tip:       { color: '#00c853', icon: '\u261D' },
+  success:   { color: '#00c853', icon: '\u2714' },
+  question:  { color: '#ffab00', icon: '?' },
+  warning:   { color: '#ff9100', icon: '\u26A0' },
+  failure:   { color: '#ff5252', icon: '\u2718' },
+  danger:    { color: '#ff1744', icon: '\u26D4' },
+  bug:       { color: '#e040fb', icon: '\uD83D\uDC1B' },
+  example:   { color: '#7c4dff', icon: '\uD83D\uDCCB' },
+  quote:     { color: '#9e9e9e', icon: '\u275D' },
+  abstract:  { color: '#00b8d4', icon: '\uD83D\uDCD1' },
+  todo:      { color: '#448aff', icon: '\uD83D\uDCDD' },
+  important: { color: '#ff9100', icon: '\uD83D\uDD25' },
+}
+
+/** Alias map for callout type names (lowercase) */
+export const TYPE_ALIASES: Record<string, string> = {
+  summary: 'abstract', tldr: 'abstract',
+  hint: 'tip',
+  check: 'success', done: 'success',
+  help: 'question', faq: 'question',
+  caution: 'warning', attention: 'warning',
+  fail: 'failure', missing: 'failure',
+  error: 'danger',
+  cite: 'quote',
+}
+
 // ─── Reusable Decoration Objects ──────────────────────────────────────────────
 
 /** Hide text (font-size: 0, position: absolute) — used for syntax markers */

@@ -8,7 +8,14 @@
  * The callout header [!type] is styled as a badge, and foldable indicators (+/-)
  * are visually marked.
  *
- * Uses regex scanning since the lezer parser doesn't understand [!type] syntax.
+ * ## Level 2: Tree-based scanning
+ *
+ * With the Lezer Callout extension active, the syntax tree contains `Callout`,
+ * `CalloutMark`, `CalloutType`, and `CalloutFoldMark` nodes. This plugin now
+ * scans the tree for Callout nodes and uses the node positions to apply
+ * decorations, which is more reliable than regex line-by-line scanning.
+ *
+ * Falls back to regex scanning if the tree doesn't contain Callout nodes.
  */
 
 import {
@@ -19,46 +26,136 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import type { Range } from '@codemirror/state'
-import { isCursorOnLine } from './shared'
+import { syntaxTree } from '@codemirror/language'
+import { isCursorOnLine, CALLOUT_TYPES, TYPE_ALIASES } from './shared'
 import { checkUpdateAction } from './drag-state'
 
-// ─── Callout Type Colors ──────────────────────────────────────────────────────
-
-const CALLOUT_TYPES: Record<string, { color: string; icon: string }> = {
-  note:      { color: '#448aff', icon: '\u270E' },
-  info:      { color: '#448aff', icon: '\u2139' },
-  tip:       { color: '#00c853', icon: '\u261D' },
-  success:   { color: '#00c853', icon: '\u2714' },
-  question:  { color: '#ffab00', icon: '?' },
-  warning:   { color: '#ff9100', icon: '\u26A0' },
-  failure:   { color: '#ff5252', icon: '\u2718' },
-  danger:    { color: '#ff1744', icon: '\u26D4' },
-  bug:       { color: '#e040fb', icon: '\uD83D\uDC1B' },
-  example:   { color: '#7c4dff', icon: '\uD83D\uDCCB' },
-  quote:     { color: '#9e9e9e', icon: '\u275D' },
-  abstract:  { color: '#00b8d4', icon: '\uD83D\uDCD1' },
-  todo:      { color: '#448aff', icon: '\uD83D\uDCDD' },
-  important: { color: '#ff9100', icon: '\uD83D\uDD25' },
-}
-
-const TYPE_ALIASES: Record<string, string> = {
-  summary: 'abstract', tldr: 'abstract',
-  hint: 'tip',
-  check: 'success', done: 'success',
-  help: 'question', faq: 'question',
-  caution: 'warning', attention: 'warning',
-  fail: 'failure', missing: 'failure',
-  error: 'danger',
-  cite: 'quote',
-}
-
-// ─── Build Decorations ────────────────────────────────────────────────────────
+// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
 
 function buildCalloutDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
   const state = view.state
   const doc = state.doc
 
+  // Try tree-based scanning first
+  const tree = syntaxTree(state)
+  let usedTree = false
+
+  for (const { from, to } of view.visibleRanges) {
+    tree.iterate({
+      from,
+      to,
+      enter(node) {
+        if (node.name === 'Callout') {
+          usedTree = true
+
+          // Extract type and fold info from children
+          let typeText = ''
+          let hasFold = false
+          let foldChar = ''
+          let markStart = node.from
+          let markEnd = node.from
+          let typeFrom = node.from
+          let typeTo = node.from
+
+          node.node.cursor().iterate((child) => {
+            if (child.name === 'CalloutType') {
+              typeText = state.doc.sliceString(child.from, child.to)
+              typeFrom = child.from
+              typeTo = child.to
+            }
+            if (child.name === 'CalloutFoldMark') {
+              hasFold = true
+              foldChar = state.doc.sliceString(child.from, child.to)
+            }
+            if (child.name === 'CalloutMark') {
+              // First mark is [!, second mark is ]
+              // We want the range from [! to ]
+              if (markStart === node.from) {
+                markStart = child.from
+              }
+              markEnd = child.to
+            }
+            return false
+          })
+
+          const rawType = typeText.toLowerCase()
+          const resolvedType = TYPE_ALIASES[rawType] ?? rawType
+          const typeInfo = CALLOUT_TYPES[resolvedType] ?? CALLOUT_TYPES.note
+
+          const line = doc.lineAt(node.from)
+          const lineFrom = line.from
+          const lineTo = line.to
+
+          if (!isCursorOnLine(state, lineFrom, lineTo)) {
+            // Line decoration for the callout header line
+            ranges.push(
+              Decoration.line({
+                class: `cm-hybrid-callout cm-hybrid-callout-${resolvedType}`,
+                attributes: {
+                  'data-callout': resolvedType,
+                  ...(hasFold ? { 'data-callout-foldable': '' } : {}),
+                  ...(hasFold && foldChar === '-' ? { 'data-callout-collapsed': '' } : {}),
+                },
+              }).range(lineFrom)
+            )
+
+            // Mark decoration for [!type]
+            ranges.push(
+              Decoration.mark({
+                class: `cm-hybrid-callout-marker cm-hybrid-callout-marker-${resolvedType}`,
+                attributes: { 'data-callout-type': resolvedType },
+              }).range(markStart, markEnd + (hasFold ? 1 : 0))
+            )
+
+            // Fade the > prefix
+            const lineText = line.text
+            const prefixMatch = lineText.match(/^(\s*>\s*)/)
+            if (prefixMatch) {
+              const prefixEnd = lineFrom + prefixMatch[1].length
+              ranges.push(
+                Decoration.mark({ class: 'cm-hybrid-callout-prefix' }).range(lineFrom, prefixEnd)
+              )
+            }
+          }
+
+          // Apply line decorations to subsequent blockquote lines in this callout
+          let nextLineNum = line.number + 1
+          while (nextLineNum <= doc.lines) {
+            const nextLine = doc.line(nextLineNum)
+            const nextText = nextLine.text
+            if (!nextText.match(/^\s*>\s/)) break
+
+            if (!isCursorOnLine(state, nextLine.from, nextLine.to)) {
+              ranges.push(
+                Decoration.line({
+                  class: `cm-hybrid-callout cm-hybrid-callout-${resolvedType} cm-hybrid-callout-body`,
+                  attributes: { 'data-callout': resolvedType },
+                }).range(nextLine.from)
+              )
+
+              const bodyPrefixMatch = nextText.match(/^(\s*>\s?)/)
+              if (bodyPrefixMatch) {
+                ranges.push(
+                  Decoration.mark({ class: 'cm-hybrid-callout-prefix' }).range(
+                    nextLine.from,
+                    nextLine.from + bodyPrefixMatch[1].length
+                  )
+                )
+              }
+            }
+
+            nextLineNum++
+          }
+        }
+      },
+    })
+  }
+
+  // If tree had Callout nodes, we're done
+  if (usedTree) return Decoration.set(ranges, true)
+
+  // ── Fallback: regex line-by-line scanning ────────────────────────────────
   for (const { from, to } of view.visibleRanges) {
     const visibleText = doc.sliceString(from, to)
 

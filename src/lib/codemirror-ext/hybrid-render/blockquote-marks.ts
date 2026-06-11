@@ -7,7 +7,11 @@
  * Note: Callout blocks (> [!note]) are handled by the callouts plugin with
  * their own styling. This plugin only handles regular blockquotes.
  *
- * Uses the lezer syntax tree to find QuoteMark nodes.
+ * ## Level 2: Tree-aware callout skipping
+ *
+ * With the Lezer Callout extension active, this plugin can detect callout
+ * lines by checking for `Callout` sibling nodes, rather than using a regex
+ * check on the line text. Falls back to regex if no Callout nodes are found.
  */
 
 import {
@@ -27,6 +31,20 @@ function buildBlockquoteMarkDecorations(view: EditorView): DecorationSet {
   const state = view.state
   const doc = state.doc
 
+  // Collect positions of Callout nodes to skip their > marks
+  const calloutRanges: Array<{ from: number; to: number }> = []
+  for (const { from, to } of view.visibleRanges) {
+    syntaxTree(state).iterate({
+      from,
+      to,
+      enter(node) {
+        if (node.name === 'Callout') {
+          calloutRanges.push({ from: node.from, to: node.to })
+        }
+      },
+    })
+  }
+
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
       from,
@@ -34,9 +52,14 @@ function buildBlockquoteMarkDecorations(view: EditorView): DecorationSet {
       enter(node) {
         if (node.name !== 'QuoteMark') return
 
-        const line = doc.lineAt(node.from)
+        // Skip if this > mark is inside a callout range
+        const inCallout = calloutRanges.some(
+          (cr) => node.from >= cr.from && node.to <= cr.to
+        )
+        if (inCallout) return
 
-        // Skip callout headers — they have their own styling from the callouts plugin
+        // Fallback: skip callout headers via regex (for when Lezer extension not loaded)
+        const line = doc.lineAt(node.from)
         const lineText = doc.sliceString(line.from, line.to)
         if (lineText.match(/^\s*>\s*\[!/)) return
 

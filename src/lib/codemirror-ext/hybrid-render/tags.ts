@@ -6,10 +6,18 @@
  * Tags must start with a letter or underscore after #, and can contain
  * letters, digits, underscores, hyphens, and forward slashes.
  *
- * Distinguishes from heading # markers by requiring valid preceding context
- * (whitespace, start of string, or certain punctuation).
- *
  * Provides atomic ranges so the cursor treats tags as single units.
+ *
+ * ## Level 2: Tree-based scanning
+ *
+ * With the Lezer Tag extension active, the syntax tree contains `Tag`,
+ * `TagMark`, and `TagName` nodes. This plugin now scans the tree instead
+ * of using regex, which:
+ * - Eliminates the #tag vs #heading disambiguation problem
+ * - Removes the need for skip-range checks (code blocks are not in the tree)
+ * - Provides incremental parsing benefits
+ *
+ * Falls back to regex scanning if the tree doesn't contain Tag nodes.
  */
 
 import {
@@ -20,6 +28,7 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import type { Range } from '@codemirror/state'
+import { syntaxTree } from '@codemirror/language'
 import {
   tagMark,
   isCursorInRange,
@@ -29,11 +38,41 @@ import {
 } from './shared'
 import { checkUpdateAction } from './drag-state'
 
+// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
+
 function buildTagDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
   const state = view.state
-  const doc = state.doc
 
+  // Try tree-based scanning first
+  const tree = syntaxTree(state)
+  let usedTree = false
+
+  for (const { from, to } of view.visibleRanges) {
+    tree.iterate({
+      from,
+      to,
+      enter(node) {
+        if (node.name === 'Tag') {
+          usedTree = true
+          const start = node.from
+          const end = node.to
+
+          // Skip if cursor is inside the tag
+          if (isCursorInRange(state, start, end)) return
+
+          // Style the entire #tag as a badge
+          ranges.push(tagMark.range(start, end))
+        }
+      },
+    })
+  }
+
+  // If tree had Tag nodes, we're done
+  if (usedTree) return Decoration.set(ranges, true)
+
+  // ── Fallback: regex scanning (if Lezer extension not loaded) ─────────────
+  const doc = state.doc
   for (const { from, to } of view.visibleRanges) {
     const skipRanges = collectSkipRanges(state, from, to)
     const visibleText = doc.sliceString(from, to)
@@ -45,21 +84,17 @@ function buildTagDecorations(view: EditorView): DecorationSet {
       const tagContent = match[1]
       const precedingLen = match[0].length - 1 - tagContent.length
       const hashPos = from + match.index + precedingLen
-      const tagEnd = hashPos + 1 + tagContent.length // includes the #
+      const tagEnd = hashPos + 1 + tagContent.length
 
-      // Skip if inside code block or inline code
       if (isInRangeList(hashPos, tagEnd, skipRanges)) continue
 
-      // Skip if the # is at the start of a line followed by a space (heading)
       const line = doc.lineAt(hashPos)
       if (hashPos === line.from && doc.sliceString(hashPos + 1, hashPos + 2) === ' ') {
         continue
       }
 
-      // Skip if cursor is inside the tag
       if (isCursorInRange(state, hashPos, tagEnd)) continue
 
-      // Style the entire #tag as a badge
       ranges.push(tagMark.range(hashPos, tagEnd))
     }
   }
