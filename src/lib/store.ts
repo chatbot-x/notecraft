@@ -3,6 +3,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+export type ViewMode = 'edit' | 'preview' | 'split'
+
 export interface Note {
   id: string
   title: string
@@ -16,15 +18,25 @@ interface NotesState {
   activeNoteId: string | null
   searchQuery: string
   sidebarOpen: boolean
+  viewMode: ViewMode
+  fontSize: number
+  saveStatus: 'idle' | 'saving' | 'saved'
+  commandPaletteOpen: boolean
+  hasHydrated: boolean
 
   // Actions
   setActiveNoteId: (id: string | null) => void
   setSearchQuery: (query: string) => void
   setSidebarOpen: (open: boolean) => void
+  setViewMode: (mode: ViewMode) => void
+  setFontSize: (size: number) => void
+  setSaveStatus: (status: 'idle' | 'saving' | 'saved') => void
+  setCommandPaletteOpen: (open: boolean) => void
+  setHasHydrated: (hydrated: boolean) => void
   createNote: () => string
   deleteNote: (id: string) => void
+  duplicateNote: (id: string) => string | null
   updateNote: (id: string, updates: Partial<Pick<Note, 'title' | 'content'>>) => void
-  getActiveNote: () => Note | undefined
   getFilteredNotes: () => Note[]
 }
 
@@ -35,10 +47,45 @@ function generateId(): string {
 function getNoteTitle(content: string): string {
   const firstLine = content.split('\n')[0].trim()
   if (!firstLine) return 'Untitled'
-  // Remove markdown heading markers
   const cleaned = firstLine.replace(/^#+\s*/, '').trim()
   return cleaned || 'Untitled'
 }
+
+export const WELCOME_NOTE_ID = '__welcome__'
+
+export const WELCOME_CONTENT = `# Welcome to NoteCraft 👋
+
+Your markdown note-taking app, powered by **CodeMirror 6**.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| \`Ctrl + N\` | Create new note |
+| \`Ctrl + K\` | Open command palette |
+| \`Ctrl + B\` | Toggle sidebar |
+| \`Ctrl + \\\`\` | Toggle edit / preview / split |
+| \`Ctrl + +\` | Increase font size |
+| \`Ctrl + -\` | Decrease font size |
+| \`Ctrl + F\` | Search in editor |
+| \`Ctrl + Z\` | Undo |
+| \`Ctrl + Shift + Z\` | Redo |
+
+## Features
+
+- **Markdown editing** with syntax highlighting & code folding
+- **Dark / Light mode** toggle
+- **Auto-save** to browser localStorage
+- **Multiple notes** with instant switching
+- **Search & filter** across all notes
+- **Edit / Preview / Split** view modes
+- **Command palette** for quick navigation
+- **Duplicate notes** for easy templating
+
+---
+
+Start writing! Everything is saved locally in your browser.
+`
 
 export const useNotesStore = create<NotesState>()(
   persist(
@@ -47,12 +94,20 @@ export const useNotesStore = create<NotesState>()(
       activeNoteId: null,
       searchQuery: '',
       sidebarOpen: true,
+      viewMode: 'edit' as ViewMode,
+      fontSize: 15,
+      saveStatus: 'idle' as 'idle' | 'saving' | 'saved',
+      commandPaletteOpen: false,
+      hasHydrated: false,
 
       setActiveNoteId: (id) => set({ activeNoteId: id }),
-
       setSearchQuery: (query) => set({ searchQuery: query }),
-
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      setViewMode: (mode) => set({ viewMode: mode }),
+      setFontSize: (size) => set({ fontSize: Math.max(12, Math.min(24, size)) }),
+      setSaveStatus: (status) => set({ saveStatus: status }),
+      setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+      setHasHydrated: (hydrated) => set({ hasHydrated: hydrated }),
 
       createNote: () => {
         const id = generateId()
@@ -67,6 +122,7 @@ export const useNotesStore = create<NotesState>()(
         set((state) => ({
           notes: [newNote, ...state.notes],
           activeNoteId: id,
+          viewMode: 'edit' as ViewMode,
         }))
         return id
       },
@@ -82,6 +138,26 @@ export const useNotesStore = create<NotesState>()(
               : state.activeNoteId
           return { notes: newNotes, activeNoteId: newActiveId }
         })
+      },
+
+      duplicateNote: (id) => {
+        const { notes } = get()
+        const note = notes.find((n) => n.id === id)
+        if (!note) return null
+        const newId = generateId()
+        const now = Date.now()
+        const duplicate: Note = {
+          id: newId,
+          title: `${note.title} (copy)`,
+          content: note.content,
+          createdAt: now,
+          updatedAt: now,
+        }
+        set((state) => ({
+          notes: [duplicate, ...state.notes],
+          activeNoteId: newId,
+        }))
+        return newId
       },
 
       updateNote: (id, updates) => {
@@ -103,11 +179,6 @@ export const useNotesStore = create<NotesState>()(
         }))
       },
 
-      getActiveNote: () => {
-        const { notes, activeNoteId } = get()
-        return notes.find((n) => n.id === activeNoteId)
-      },
-
       getFilteredNotes: () => {
         const { notes, searchQuery } = get()
         if (!searchQuery.trim()) return notes
@@ -124,7 +195,15 @@ export const useNotesStore = create<NotesState>()(
       partialize: (state) => ({
         notes: state.notes,
         activeNoteId: state.activeNoteId,
+        sidebarOpen: state.sidebarOpen,
+        viewMode: state.viewMode,
+        fontSize: state.fontSize,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setHasHydrated(true)
+        }
+      },
     }
   )
 )

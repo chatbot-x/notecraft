@@ -35,19 +35,22 @@ import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { lintKeymap } from '@codemirror/lint'
 import { useNotesStore } from '@/lib/store'
 
-// Compartments for dynamic configuration
 const themeCompartment = new Compartment()
+const fontSizeCompartment = new Compartment()
 
 interface CodeMirrorEditorProps {
   initialValue: string
   noteId: string
   isDark: boolean
+  fontSize: number
+  onSaveStatusChange: (status: 'idle' | 'saving' | 'saved') => void
 }
 
-export function CodeMirrorEditor({ initialValue, noteId, isDark }: CodeMirrorEditorProps) {
+export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSaveStatusChange }: CodeMirrorEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const isUpdatingRef = useRef(false)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const updateNote = useNotesStore((s) => s.updateNote)
 
   const getExtensions = useCallback((): Extension[] => {
@@ -56,14 +59,18 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark }: CodeMirrorEdi
       highlightActiveLineGutter(),
       highlightSpecialChars(),
       history(),
-      foldGutter(),
+      foldGutter({
+        gutterDOMClass: 'cm-fold-gutter',
+      }),
       drawSelection(),
       codeFolding(),
       indentOnInput(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       bracketMatching(),
       closeBrackets(),
-      autocompletion(),
+      autocompletion({
+        icons: false,
+      }),
       rectangularSelection(),
       crosshairCursor(),
       highlightActiveLine(),
@@ -80,42 +87,119 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark }: CodeMirrorEdi
       ]),
       markdown({ base: markdownLanguage }),
       themeCompartment.of(isDark ? oneDark : []),
+      fontSizeCompartment.of(EditorView.theme({
+        '&': { fontSize: `${fontSize}px` },
+      })),
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
         if (update.docChanged && !isUpdatingRef.current) {
           const content = update.state.doc.toString()
           updateNote(noteId, { content })
+
+          // Debounced save indicator
+          onSaveStatusChange('saving')
+          if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+          saveTimeoutRef.current = setTimeout(() => {
+            onSaveStatusChange('saved')
+            setTimeout(() => onSaveStatusChange('idle'), 1500)
+          }, 600)
         }
       }),
-      // Custom theme adjustments
       EditorView.theme({
         '&': {
           height: '100%',
-          fontSize: '15px',
+          fontSize: `${fontSize}px`,
         },
         '.cm-scroller': {
           overflow: 'auto',
           fontFamily: 'var(--font-geist-mono), monospace',
         },
         '.cm-content': {
-          padding: '16px 0',
+          padding: '20px 4px',
+          caretColor: isDark ? '#e2e8f0' : '#1e293b',
         },
         '.cm-gutters': {
           backgroundColor: 'transparent',
-          borderRight: '1px solid var(--border)',
+          borderRight: 'none',
+          color: isDark ? '#64748b' : '#94a3b8',
+          paddingLeft: '8px',
+          paddingRight: '8px',
         },
         '.cm-activeLineGutter': {
-          backgroundColor: 'var(--muted)',
+          backgroundColor: 'transparent',
+          color: isDark ? '#94a3b8' : '#64748b',
+          fontWeight: '600',
+        },
+        '.cm-foldGutter': {
+          opacity: '0.5',
+          transition: 'opacity 0.15s',
+        },
+        '.cm-foldGutter:hover': {
+          opacity: '1',
+        },
+        '&.cm-focused': {
+          outline: 'none',
         },
         '&.cm-focused .cm-cursor': {
-          borderLeftColor: 'var(--primary)',
+          borderLeftColor: isDark ? '#60a5fa' : '#3b82f6',
+          borderLeftWidth: '2px',
         },
         '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
-          backgroundColor: 'var(--accent) !important',
+          backgroundColor: isDark ? 'rgba(96, 165, 250, 0.25)' : 'rgba(59, 130, 246, 0.15)',
+        },
+        '.cm-line': {
+          padding: '0 12px',
+        },
+        '.cm-activeLine': {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+        },
+        // Markdown heading styles
+        '.cm-header-1': {
+          fontWeight: '700',
+          fontSize: '1.6em',
+          letterSpacing: '-0.02em',
+          lineHeight: '1.4',
+        },
+        '.cm-header-2': {
+          fontWeight: '600',
+          fontSize: '1.3em',
+          letterSpacing: '-0.01em',
+          lineHeight: '1.4',
+        },
+        '.cm-header-3': {
+          fontWeight: '600',
+          fontSize: '1.1em',
+          lineHeight: '1.4',
+        },
+        '.cm-strong': {
+          fontWeight: '700',
+        },
+        '.cm-em': {
+          fontStyle: 'italic',
+        },
+        '.cm-strikethrough': {
+          textDecoration: 'line-through',
+          opacity: '0.6',
+        },
+        '.cm-link': {
+          textDecoration: 'underline',
+          textUnderlineOffset: '3px',
+        },
+        '.cm-url': {
+          opacity: '0.6',
+        },
+        '.cm-hr': {
+          opacity: '0.3',
+        },
+        // Code block styling
+        '.cm-inline-code': {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+          borderRadius: '3px',
+          padding: '1px 4px',
         },
       }),
     ]
-  }, [noteId, isDark, updateNote])
+  }, [noteId, isDark, fontSize, updateNote, onSaveStatusChange])
 
   // Initialize editor
   useEffect(() => {
@@ -136,8 +220,9 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark }: CodeMirrorEdi
     return () => {
       view.destroy()
       viewRef.current = null
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     }
-  }, [noteId]) // Re-create editor when note changes
+  }, [noteId])
 
   // Update theme when dark mode changes
   useEffect(() => {
@@ -148,7 +233,18 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark }: CodeMirrorEdi
     })
   }, [isDark])
 
-  // Sync content when noteId changes (but not from our own edits)
+  // Update font size
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: fontSizeCompartment.reconfigure(
+        EditorView.theme({ '&': { fontSize: `${fontSize}px` } })
+      ),
+    })
+  }, [fontSize])
+
+  // Sync content when noteId changes
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
@@ -156,11 +252,7 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark }: CodeMirrorEdi
     if (currentContent !== initialValue) {
       isUpdatingRef.current = true
       view.dispatch({
-        changes: {
-          from: 0,
-          to: view.state.doc.length,
-          insert: initialValue,
-        },
+        changes: { from: 0, to: view.state.doc.length, insert: initialValue },
       })
       isUpdatingRef.current = false
     }

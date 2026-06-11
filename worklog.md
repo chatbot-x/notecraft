@@ -1,26 +1,23 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Build a client-side note-taking app with CodeMirror 6 editor
+Task: Refine NoteCraft UX with polished interactions
 
 Work Log:
-- Initialized the fullstack development environment
-- Explored existing project structure (Next.js 16, App Router, shadcn/ui, Zustand)
-- Installed CodeMirror 6 dependencies (@codemirror/state, @codemirror/view, @codemirror/commands, @codemirror/lang-markdown, @codemirror/theme-one-dark, @codemirror/autocomplete, @codemirror/search, @codemirror/lint, @codemirror/language)
-- Created Zustand store with localStorage persistence for notes management
-- Built CodeMirror 6 editor component with markdown support, dark mode, syntax highlighting
-- Built sidebar component with search, note creation, and deletion
-- Built main NoteApp component with note switching and theme toggle
-- Fixed hydration mismatch by using dynamic import with ssr: false
-- Fixed "multiple instances of @codemirror/state" error by removing @mdxeditor/editor (which depended on codemirror meta-package) and deduplicating all nested @codemirror packages in node_modules
-- Removed @codemirror/language-data and codemirror meta-package to avoid duplicate state issues
-- Added package.json overrides for @codemirror/state, @codemirror/view, @codemirror/language
-- Fixed lint errors (unused eslint-disable directive, setState in effect)
-- Verified app works with Agent Browser: creating notes, typing in CodeMirror, switching between notes, search, dark/light mode toggle
-- Took screenshots of the working app
+- Enhanced Zustand store with viewMode, fontSize, saveStatus, commandPaletteOpen, duplicateNote
+- Added welcome note that appears on first visit with keyboard shortcut reference
+- Built CodeMirror 6 editor with save indicator (debounced: saving → saved → idle)
+- Added font size compartment for dynamic font size changes
+- Added markdown heading/font styling in CodeMirror theme
+- Built MarkdownPreview component with react-markdown + remark-gfm for GFM tables
+- Built CommandPalette with search, keyboard navigation, categories (Actions/Notes/View)
+- Rebuilt Sidebar with better UX: active note ring highlight, duplicate button, clear search button, animated list items, command palette shortcut in footer, tooltips on all buttons
+- Rebuilt NoteApp with: view mode switcher (edit/preview/split), font size controls, save indicator, word/line count, theme toggle with tooltip, global keyboard shortcuts (Ctrl+N/B/K/\/+/-), animated empty state with shortcut hints
+- Added custom CSS for markdown preview scrollbar, selection colors, focus rings
+- Verified all features work with Agent Browser: welcome note, editor, preview, split, command palette, note creation, note switching, dark mode
 
 Stage Summary:
-- Fully functional client-side note-taking app with CodeMirror 6
-- Features: Markdown editing with syntax highlighting, dark/light mode, auto-save to localStorage, note CRUD, search/filter
-- Key files: /src/lib/store.ts, /src/components/editor.tsx, /src/components/sidebar.tsx, /src/components/note-app.tsx, /src/app/page.tsx
-- Screenshots saved: /home/z/my-project/download/notecraft-dark.png, /home/z/my-project/download/notecraft-light.png
+- Fully polished UX with command palette, view modes, keyboard shortcuts, animations
+- Key new files: /src/components/command-palette.tsx, /src/components/markdown-preview.tsx
+- Key updated files: /src/lib/store.ts, /src/components/editor.tsx, /src/components/sidebar.tsx, /src/components/note-app.tsx
+- Screenshots saved to /home/z/my-project/download/

@@ -197,3 +197,55 @@
 .codemirror-editor .cm-panel.cm-search button:hover {
   background: var(--accent);
 }
+
+/* Markdown Preview Styles */
+.markdown-preview {
+  line-height: 1.7;
+  color: var(--foreground);
+}
+
+.markdown-preview > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-preview::-webkit-scrollbar {
+  width: 8px;
+}
+
+.markdown-preview::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.markdown-preview::-webkit-scrollbar-thumb {
+  background: oklch(0.7 0 0 / 25%);
+  border-radius: 4px;
+}
+
+.markdown-preview::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.6 0 0 / 40%);
+}
+
+.dark .markdown-preview::-webkit-scrollbar-thumb {
+  background: oklch(0.4 0 0 / 35%);
+}
+
+/* Selection color */
+::selection {
+  background: oklch(0.6 0.2 250 / 25%);
+}
+
+.dark ::selection {
+  background: oklch(0.6 0.2 250 / 35%);
+}
+
+/* Smooth transitions for interactive elements */
+button, a, [role="button"] {
+  transition: all 0.15s ease;
+}
+
+/* Subtle focus ring */
+:focus-visible {
+  outline: 2px solid oklch(0.6 0.15 250);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
