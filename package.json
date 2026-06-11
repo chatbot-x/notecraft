@@ -11,9 +11,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
-    "cf:build": "npx @opennextjs/cloudflare build",
+    "cf:build": "npx @opennextjs/cloudflare build && bash scripts/prepare-pages.sh",
     "cf:dev": "npx wrangler dev",
-    "cf:deploy": "npx @opennextjs/cloudflare build && npx wrangler deploy"
+    "cf:deploy": "npm run cf:build && npx wrangler pages deploy .open-next"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
