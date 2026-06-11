@@ -120,6 +120,9 @@ graph LR
 > [!note] Note
 > This is a note callout — great for highlighting important information.
 
+> [!important] Critical Deadline
+> The final code freeze is scheduled for July 15th. No exceptions.
+
 > [!tip] Tip
 > Try using \`Ctrl + Shift + F\` to format your Markdown with Prettier!
 

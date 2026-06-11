@@ -7,10 +7,13 @@
  *   >
  *   > More content (multi-paragraph)
  *
- * Recognized types: note, info, tip, success, question, warning,
- * failure, danger, bug, example, quote, abstract, todo
+ * Recognized types (case-insensitive):
+ *   note, info, tip, success, question, warning, failure, danger,
+ *   bug, example, quote, abstract, todo, important
  *
- * Any unrecognized type falls back to "note" style.
+ * Any unrecognized type still renders as a callout with a generic style
+ * that inherits the base callout appearance (instead of falling back to
+ * "note" which was confusing).
  *
  * Implementation strategy:
  *   Registers a markdown-it core rule that scans the parsed token stream
@@ -38,21 +41,29 @@ export type CalloutType =
   | 'quote'
   | 'abstract'
   | 'todo'
+  | 'important'
 
-const CALLOUT_TYPES: Record<string, { icon: string } | undefined> = {
-  note:      { icon: '\u270E' },
-  info:      { icon: '\u2139' },
-  tip:       { icon: '\u261D' },
-  success:   { icon: '\u2714' },
-  question:  { icon: '\u2753' },
-  warning:   { icon: '\u26A0' },
-  failure:   { icon: '\u2718' },
-  danger:    { icon: '\u26D4' },
-  bug:       { icon: '\u{1F41B}' },
-  example:   { icon: '\u{1F4CB}' },
-  quote:     { icon: '\u275D' },
-  abstract:  { icon: '\u{1F4D1}' },
-  todo:      { icon: '\u{1F4DD}' },
+interface CalloutMeta {
+  icon: string
+  /** Fallback type to use for CSS when the type is unknown */
+  fallback?: string
+}
+
+const CALLOUT_TYPES: Record<string, CalloutMeta | undefined> = {
+  note:      { icon: '\u270E' },       // ✎
+  info:      { icon: '\u2139' },       // ℹ
+  tip:       { icon: '\u261D' },       // ☝
+  success:   { icon: '\u2714' },       // ✔
+  question:  { icon: '\u2753' },       // ❓
+  warning:   { icon: '\u26A0' },       // ⚠
+  failure:   { icon: '\u2718' },       // ✘
+  danger:    { icon: '\u26D4' },       // ⛔
+  bug:       { icon: '\u{1F41B}' },    // 🐛
+  example:   { icon: '\u{1F4CB}' },    // 📋
+  quote:     { icon: '\u275D' },       // ❝
+  abstract:  { icon: '\u{1F4D1}' },    // 📑
+  todo:      { icon: '\u{1F4DD}' },    // 📝
+  important: { icon: '\u{1F525}' },    // 🔥
 }
 
 // Regex to match [!type] optional title at the start of inline content.
@@ -118,8 +129,10 @@ function calloutRule(state: StateCore): void {
   for (let r = toTransform.length - 1; r >= 0; r--) {
     const { openIdx, closeIdx, type: rawType, title: rawTitle } = toTransform[r]
 
-    const meta = CALLOUT_TYPES[rawType] ?? CALLOUT_TYPES['note']!
-    const displayType = CALLOUT_TYPES[rawType] ? rawType : 'note'
+    const isKnownType = !!CALLOUT_TYPES[rawType]
+    const meta = CALLOUT_TYPES[rawType] ?? { icon: '\u270E' }  // generic icon for unknown types
+    // Keep the original type name even if unknown — CSS will use the base callout style
+    const displayType = rawType
     const displayTitle =
       rawTitle || displayType.charAt(0).toUpperCase() + displayType.slice(1)
 

@@ -893,6 +893,12 @@
 }
 .markdown-preview .callout-todo .callout-icon { color: oklch(0.55 0.15 250); }
 
+.markdown-preview .callout-important {
+  border-left-color: oklch(0.6 0.2 25);
+  background: oklch(0.96 0.05 25);
+}
+.markdown-preview .callout-important .callout-icon { color: oklch(0.6 0.2 25); }
+
 /* Dark mode callout overrides */
 .dark .markdown-preview .callout-note { background: oklch(0.2 0.03 250); }
 .dark .markdown-preview .callout-info { background: oklch(0.2 0.03 210); }
@@ -907,6 +913,7 @@
 .dark .markdown-preview .callout-quote { background: oklch(0.22 0 0); }
 .dark .markdown-preview .callout-abstract { background: oklch(0.2 0.03 200); }
 .dark .markdown-preview .callout-todo { background: oklch(0.2 0.02 250); }
+.dark .markdown-preview .callout-important { background: oklch(0.22 0.05 25); }
 
 /* ─── Medium Zoom ───────────────────────────────────────────────────────── */
 
