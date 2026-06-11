@@ -11,10 +11,8 @@
  */
 
 import type MarkdownIt from 'markdown-it'
-import type StateCore from 'markdown-it/lib/rules_core/state_core'
-import type Token from 'markdown-it/lib/token'
 
-const MERMAD_LANG = 'mermaid'
+const MERMAID_LANG = 'mermaid'
 
 export interface MermaidPluginOptions {
   /** CSS class for the container div. Default: "mermaid-container" */
@@ -28,20 +26,20 @@ export interface MermaidPluginOptions {
 export default function mermaidPlugin(md: MarkdownIt, options: MermaidPluginOptions = {}): void {
   const containerClass = options.containerClass ?? 'mermaid-container'
   const loadingClass = options.loadingClass ?? 'mermaid-loading'
-  const errorClass = options.errorClass ?? 'mermaid-error'
+  const _errorClass = options.errorClass ?? 'mermaid-error'
 
   // Intercept the fence renderer to catch ```mermaid blocks
   const defaultFenceRenderer =
     md.renderer.rules.fence ||
-    function (tokens: Token[], idx: number, options: MarkdownIt.Options, _env: unknown, self: MarkdownIt) {
-      return self.renderToken(tokens, idx, options)
+    function (tokens, idx, opts, _env, self) {
+      return self.renderToken(tokens, idx, opts)
     }
 
   md.renderer.rules.fence = function (tokens, idx, opts, env, self) {
     const token = tokens[idx]
     const info = token.info ? token.info.trim().toLowerCase() : ''
 
-    if (info !== MERMAD_LANG) {
+    if (info !== MERMAID_LANG) {
       return defaultFenceRenderer(tokens, idx, opts, env, self)
     }
 

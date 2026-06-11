@@ -18,7 +18,6 @@ export function CommandPalette() {
   const {
     notes,
     activeNoteId,
-    isDark,
     sidebarOpen,
     commandPaletteOpen,
     setCommandPaletteOpen,
@@ -29,6 +28,17 @@ export function CommandPalette() {
     setSidebarOpen,
     setViewMode,
   } = useNotesStore()
+
+  const [isDark, setIsDark] = useState(false)
+
+  // Track dark mode reactively
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'))
+    check()
+    const observer = new MutationObserver(check)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)

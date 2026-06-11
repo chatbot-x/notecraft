@@ -350,25 +350,27 @@ function buildDecorations(view: EditorView): DecorationSet {
 /** Global click handler for checkbox widgets in the editor */
 function handleCheckboxClick(view: EditorView, pos: number): boolean {
   // Find the TaskMarker node at this position
-  let nodeAtPos: { from: number; to: number; name: string } | null = null
+  let foundFrom = -1
+  let foundTo = -1
 
   syntaxTree(view.state).iterate({
     from: Math.max(0, pos - 5),
     to: Math.min(view.state.doc.length, pos + 5),
     enter(node) {
       if (node.name === 'TaskMarker') {
-        nodeAtPos = { from: node.from, to: node.to, name: node.name }
+        foundFrom = node.from
+        foundTo = node.to
       }
     },
   })
 
-  if (!nodeAtPos) return false
+  if (foundFrom === -1) return false
 
-  const text = view.state.doc.sliceString(nodeAtPos.from, nodeAtPos.to)
+  const text = view.state.doc.sliceString(foundFrom, foundTo)
   const newText = text === '[x]' || text === '[X]' ? '[ ]' : '[x]'
 
   view.dispatch({
-    changes: { from: nodeAtPos.from, to: nodeAtPos.to, insert: newText },
+    changes: { from: foundFrom, to: foundTo, insert: newText },
   })
 
   return true
@@ -439,7 +441,7 @@ const hybridRenderPlugin = ViewPlugin.fromClass(
   {
     decorations: (v) => v.decorations,
     eventHandlers: {
-      click(view, event) {
+      click(event: MouseEvent, view: EditorView) {
         const target = event.target as HTMLElement
 
         // Handle checkbox clicks

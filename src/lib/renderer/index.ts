@@ -256,8 +256,6 @@ function sanitizeHtml(html: string): string {
     ADD_TAGS: ['input'],
     // Allow data: URIs for images (base64 uploads)
     ADD_DATA_URI_TAGS: ['img'],
-    // Preserve heading IDs
-    ALLOW_ID: true,
   })
 }
 

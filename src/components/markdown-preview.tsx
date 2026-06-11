@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { renderMarkdownSync, renderMarkdown, type RenderResult } from '@/lib/renderer'
-import mediumZoom from 'medium-zoom'
+import mediumZoom, { type Zoom } from 'medium-zoom'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ export function MarkdownPreview({
   const containerRef = useRef<HTMLDivElement>(null)
   const [renderResult, setRenderResult] = useState<RenderResult>({ html: '', headings: [] })
   const [isRendering, setIsRendering] = useState(false)
-  const zoomRef = useRef<mediumZoom.Zoom | null>(null)
+  const zoomRef = useRef<Zoom | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ─── Render Markdown ──────────────────────────────────────────────────

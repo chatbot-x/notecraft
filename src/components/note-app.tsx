@@ -63,6 +63,7 @@ export function NoteApp() {
   const fontSize = useNotesStore((s) => s.fontSize)
   const sidebarOpen = useNotesStore((s) => s.sidebarOpen)
   const createNote = useNotesStore((s) => s.createNote)
+  const updateNote = useNotesStore((s) => s.updateNote)
   const setActiveNoteId = useNotesStore((s) => s.setActiveNoteId)
   const setSidebarOpen = useNotesStore((s) => s.setSidebarOpen)
   const setViewMode = useNotesStore((s) => s.setViewMode)
