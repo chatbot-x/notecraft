@@ -41,7 +41,6 @@ import {
   formatDocument,
   hybridRender,
   inlineSuggestion,
-  slugPanelExtensions,
 } from '@/lib/codemirror-ext'
 import { Toolbar } from '@/lib/codemirror-ext'
 
@@ -145,8 +144,7 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
         delay: 1000,
         accept_shortcut: 'Tab',
       }),
-      // Slug input panel (replaces browser prompt() for heading ID)
-      ...slugPanelExtensions,
+
       themeCompartment.of(isDark ? oneDark : []),
       colorThemeCompartment.of(EditorView.theme({
         '.cm-content': {

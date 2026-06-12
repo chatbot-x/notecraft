@@ -8,7 +8,7 @@
  * - codemirror-companion-extension (rizerphe) → Stabilized inline AI suggestions
  * - codemirror-final-newline (yeliex) → Configurable trailing newline
  * - NEW: Slash commands via @codemirror/autocomplete
- * - NEW: Heading slug utilities (custom, no rendering)
+ * - NEW: Heading slug utilities (heading anchor generation, panel removed)
  * - NEW: Hybrid render — Obsidian-style Live Preview decorations
  *
  * Usage:
@@ -57,11 +57,11 @@ export type { ImageUploadOptions, UploadCallback, UploadActionParams } from './i
 export { inlineSuggestion, forceableInlineSuggestion } from './inline-suggestion'
 export type { InlineSuggestionOptions, Suggestion, ForceableInlineSuggestionResult } from './inline-suggestion'
 
-// Slug utilities
+// Slug utilities (heading anchor/slug generation — panel removed)
 export {
-  copyHeadingSlug, setHeadingSlug, removeHeadingSlug, jumpToHeading,
+  jumpToHeading,
   generateSlug, generateSlugWithSlugger, parseHeading, scanDocumentHeadings,
-  getCurrentHeadingSlug, slugPanelExtensions,
+  getCurrentHeadingSlug,
 } from './slug'
 
 // Final newline

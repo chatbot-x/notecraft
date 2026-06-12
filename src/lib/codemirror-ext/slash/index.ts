@@ -24,7 +24,6 @@ import {
   formatDocument,
 } from '../commands'
 import { createImageUploadCommand } from '../image'
-import { copyHeadingSlug, setHeadingSlug } from '../slug'
 import { imageDataUrlHandler } from '@/lib/image-upload'
 
 // ─── Slash Command Definitions ─────────────────────────────────────────────────
@@ -95,10 +94,6 @@ function buildSlashCommands(): SlashCommandOption[] {
     { label: 'Image', detail: 'Insert', keywords: ['image', 'img', 'photo', 'picture'], apply: commandApply(image) },
     { label: 'Upload Image', detail: 'Insert', boost: 3, keywords: ['upload', 'image', 'photo', 'file', 'attach'], apply: commandApply(slashImageUploadCommand) },
     { label: 'Table', detail: 'Insert', keywords: ['table', 'grid'], apply: commandApply(table) },
-
-    // Slug
-    { label: 'Copy Heading Link', detail: 'Slug', keywords: ['slug', 'anchor', 'id', 'heading', 'link', 'copy'], apply: commandApply(copyHeadingSlug) },
-    { label: 'Set Heading ID', detail: 'Slug', keywords: ['slug', 'anchor', 'id', 'heading', 'set'], apply: commandApply(setHeadingSlug) },
 
     // Formatting
     { label: 'Format Document', detail: 'Format', boost: 2, keywords: ['format', 'prettier', 'pretty', 'clean', 'organize', 'tidy'], apply: commandApply(formatDocument) },

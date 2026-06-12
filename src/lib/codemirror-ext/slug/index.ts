@@ -6,14 +6,13 @@
  *
  * Features:
  * - Generate GitHub-style slugs from heading text (via github-slugger)
- * - Copy slug to clipboard command
  * - Generate heading ID attributes for markdown export
  * - Detect duplicate headings with suffix numbering
  * - Support explicit {#custom-slug} syntax
  */
 
-import { EditorView, type Command, showPanel, type Panel } from '@codemirror/view'
-import { EditorSelection, StateEffect, StateField } from '@codemirror/state'
+import { EditorView, type Command } from '@codemirror/view'
+import { EditorSelection } from '@codemirror/state'
 
 // ─── Slug Generation ───────────────────────────────────────────────────────────
 
@@ -127,180 +126,7 @@ export function scanDocumentHeadings(doc: string): Map<number, { level: number; 
   return result
 }
 
-// ─── Commands ──────────────────────────────────────────────────────────────────
 
-/**
- * Copy the slug of the heading at the current cursor position to clipboard.
- * Returns true if a heading was found, false otherwise.
- */
-export const copyHeadingSlug: Command = (view) => {
-  const { state } = view
-  const line = state.doc.lineAt(state.selection.main.head)
-  const parsed = parseHeading(line.text)
-
-  if (!parsed) return false
-
-  const slug = parsed.customSlug || generateSlug(parsed.title)
-
-  // Copy to clipboard
-  if (typeof navigator !== 'undefined' && navigator.clipboard) {
-    navigator.clipboard.writeText(`#${slug}`).catch(() => {
-      // Fallback: use execCommand
-      const textarea = document.createElement('textarea')
-      textarea.value = `#${slug}`
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-    })
-  }
-
-  return true
-}
-
-// ─── Slug Input Panel (replaces browser prompt()) ─────────────────────────────
-
-const openSlugPanel = StateEffect.define<{ defaultSlug: string; lineFrom: number; lineTo: number; hasCustomSlug: boolean }>()
-const closeSlugPanel = StateEffect.define<null>()
-
-const slugPanelOpen = StateField.define<boolean>({
-  create: () => false,
-  update: (value, tr) => {
-    for (const effect of tr.effects) {
-      if (effect.is(openSlugPanel)) return true
-      if (effect.is(closeSlugPanel)) return false
-    }
-    return value
-  },
-})
-
-function createSlugPanel(view: EditorView): Panel {
-  const dom = document.createElement('div')
-  dom.className = 'cm-slug-panel'
-  dom.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid var(--cm-border, #e0e0e0);background:var(--cm-background, #fff);font-size:13px;'
-
-  const label = document.createElement('label')
-  label.textContent = 'Heading ID:'
-  label.style.cssText = 'white-space:nowrap;color:var(--cm-text, #333);'
-
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.placeholder = 'my-heading-id'
-  input.style.cssText = 'flex:1;padding:4px 8px;border:1px solid var(--cm-border, #ccc);border-radius:4px;font-size:13px;background:var(--cm-background, #fff);color:var(--cm-text, #333);outline:none;'
-
-  const confirmBtn = document.createElement('button')
-  confirmBtn.textContent = 'Set'
-  confirmBtn.style.cssText = 'padding:4px 12px;border-radius:4px;background:#3b82f6;color:#fff;border:none;cursor:pointer;font-size:13px;'
-
-  const cancelBtn = document.createElement('button')
-  cancelBtn.textContent = 'Cancel'
-  cancelBtn.style.cssText = 'padding:4px 8px;border-radius:4px;background:transparent;color:var(--cm-text, #666);border:1px solid var(--cm-border, #ccc);cursor:pointer;font-size:13px;'
-
-  dom.appendChild(label)
-  dom.appendChild(input)
-  dom.appendChild(confirmBtn)
-  dom.appendChild(cancelBtn)
-
-  let pendingEffect: { defaultSlug: string; lineFrom: number; lineTo: number; hasCustomSlug: boolean } | null = null
-
-  // Apply slug on confirm
-  function applySlug() {
-    const slug = input.value.trim()
-    if (!slug || !pendingEffect) {
-      view.dispatch({ effects: closeSlugPanel.of(null) })
-      view.focus()
-      return
-    }
-
-    const { lineFrom, lineTo, hasCustomSlug } = pendingEffect
-    const line = view.state.doc.lineAt(lineFrom)
-    let newLineText: string
-    if (hasCustomSlug) {
-      newLineText = line.text.replace(/\{#[^}]+\}/, `{#${slug}}`)
-    } else {
-      newLineText = `${line.text} {#${slug}}`
-    }
-
-    view.dispatch({
-      changes: { from: line.from, to: line.to, insert: newLineText },
-      effects: closeSlugPanel.of(null),
-    })
-    view.focus()
-  }
-
-  function cancel() {
-    view.dispatch({ effects: closeSlugPanel.of(null) })
-    view.focus()
-  }
-
-  confirmBtn.addEventListener('click', applySlug)
-  cancelBtn.addEventListener('click', cancel)
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); applySlug() }
-    if (e.key === 'Escape') { e.preventDefault(); cancel() }
-  })
-
-  return {
-    dom,
-    update(update) {
-      for (const effect of update.transactions.flatMap(t => t.effects)) {
-        if (effect.is(openSlugPanel)) {
-          pendingEffect = effect.value
-          input.value = effect.value.defaultSlug
-          requestAnimationFrame(() => input.select())
-        }
-      }
-    },
-    destroy() {
-      confirmBtn.removeEventListener('click', applySlug)
-      cancelBtn.removeEventListener('click', cancel)
-    },
-  }
-}
-
-const slugPanelExtension = showPanel.of(createSlugPanel)
-
-/**
- * Insert or update an explicit {#slug} attribute on the heading at cursor.
- * Shows an inline panel below the editor (no browser prompt()).
- */
-export const setHeadingSlug: Command = (view) => {
-  const { state } = view
-  const line = state.doc.lineAt(state.selection.main.head)
-  const parsed = parseHeading(line.text)
-
-  if (!parsed) return false
-
-  const defaultSlug = parsed.customSlug || generateSlug(parsed.title)
-
-  view.dispatch({
-    effects: openSlugPanel.of({
-      defaultSlug,
-      lineFrom: line.from,
-      lineTo: line.to,
-      hasCustomSlug: !!parsed.customSlug,
-    }),
-  })
-  return true
-}
-
-/**
- * Remove the explicit {#slug} attribute from the heading at cursor.
- */
-export const removeHeadingSlug: Command = (view) => {
-  const { state } = view
-  const line = state.doc.lineAt(state.selection.main.head)
-  const parsed = parseHeading(line.text)
-
-  if (!parsed || !parsed.customSlug) return false
-
-  const newLineText = line.text.replace(/\s*\{#[^}]+\}/, '')
-  view.dispatch({
-    changes: { from: line.from, to: line.to, insert: newLineText },
-  })
-  view.focus()
-  return true
-}
 
 /**
  * Jump to a heading by its slug. Searches the document for a heading
@@ -338,5 +164,4 @@ export function getCurrentHeadingSlug(view: EditorView): string | null {
   return parsed.customSlug || generateSlug(parsed.title)
 }
 
-/** Extensions required for the slug input panel (add to editor extensions array) */
-export const slugPanelExtensions = [slugPanelOpen, slugPanelExtension]
+
