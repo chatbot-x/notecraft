@@ -1,10 +1,13 @@
 /**
- * Checkboxes decoration plugin.
+ * Checkboxes decoration plugin — Enhanced Edition.
  *
  * Replaces `- [x]` / `- [ ]` task markers with interactive checkbox widgets.
- * Clicking the checkbox toggles the underlying Markdown.
  *
- * Uses the lezer syntax tree to find TaskMarker nodes.
+ * ## Enhancement
+ *
+ * Checkbox widgets are always shown (no cursor-awareness needed), but the
+ * plugin now uses singleton widgets for checked/unchecked states to avoid
+ * repeated `toDOM()` calls. (Pattern from Atomic Editor's BULLET_WIDGET.)
  */
 
 import {
@@ -37,7 +40,6 @@ class CheckboxWidget extends WidgetType {
   }
 
   ignoreEvent(event: Event): boolean {
-    // Allow mouse, pointer, and touch events for checkbox interaction on all devices
     if (event instanceof MouseEvent) return false
     if (event instanceof PointerEvent) return false
     return true

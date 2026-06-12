@@ -5,30 +5,30 @@
  * the raw Markdown source in the editor. This is the orchestrator module
  * that combines all feature plugins, atomic ranges, and the unified theme.
  *
- * ## Architecture
+ * ## Architecture (Enhanced v2)
  *
  * Each feature is a separate ViewPlugin or StateField in its own module:
  *
  * ### Inline Features (ViewPlugin)
  * - `heading-marks.ts`    — Hide `#` on headings + heading size styling
- * - `emphasis-marks.ts`   — Hide `**`, `*`, `_`, `__`, `~~` delimiters
+ * - `emphasis-marks.ts`   — Hide `**`, `*`, `_`, `__`, `~~` delimiters + mid-typing supplement
  * - `embed-images.ts`    — Style ![[embed images]] with thumbnail widgets
- * - `links.ts`            — Style [links](url) and ![images](url)
+ * - `links.ts`            — Style [links](url) and ![images](url) + image dimension cache
  * - `checkboxes.ts`       — Interactive checkbox widgets
  * - `inline-code.ts`      — Inline code background + hide backticks
- * - `tags.ts`             — Obsidian #tag badge styling, self-provides atomic ranges
+ * - `tags.ts`             — Obsidian #tag badge styling
  * - `callouts.ts`         — Callout line decorations > [!note]
- * - `code-blocks.ts`      — Fence hiding, language badge
+ * - `code-blocks.ts`      — Fence hiding, language badge (singleton widgets)
  * - `blockquote-marks.ts` — Fade `>` blockquote markers
- * - `comments.ts`         — Hide %%comments%%
+ * - `comments.ts`         — Hide %%comments%% (singleton indicator widget)
  * - `block-refs.ts`       — Style ^block-id as clickable badge
  * - `embed-transclusions.ts` — ![[note]] transclusion widgets
  * - `admonitions.ts`      — ~~~ad-note code-block callouts
- * - `tables.ts`           — WYSIWYG table rendering (hide pipes, style cells)
+ * - `tables.ts`           — WYSIWYG table rendering (alignment, header, skip guard)
  * - `footnotes.ts`        — Footnote reference/definition styling
  *
  * ### Block Features (StateField — required for layout-changing decorations)
- * - `hr.ts`               — Visual horizontal rule widget (block replace)
+ * - `hr.ts`               — Visual horizontal rule widget (singleton, block replace)
  * - `math.ts`             — Display math $$...$$ rendering (block replace)
  * - `frontmatter.ts`      — YAML frontmatter collapsed toggle
  *
@@ -36,28 +36,32 @@
  * - `shared.ts`           — Cursor checks, regex patterns, reusable decorations
  * - `atomic-ranges.ts`    — Fallback atomic ranges for decorations
  * - `drag-state.ts`       — Mouse-drag suppression to prevent flicker
- * - `cursor-awareness.ts` — Centralized cursor position tracking (performance)
+ * - `cursor-awareness.ts` — Centralized cursor position tracking + `shouldShowSource()`
  * - `theme.ts`            — Unified theme with dark mode overrides
  *
- * ## Feature Flags
+ * ## Key Improvements (v2)
  *
- * Every feature can be toggled on/off:
- * ```ts
- * hybridRender({ tags: true, callouts: false, comments: true })
- * ```
+ * 1. **`shouldShowSource()` centralized API** — All plugins now use a single
+ *    decision function for cursor-awareness, ensuring consistent behavior
+ *    with drag-suppression and focus awareness.
  *
- * ## Cursor Awareness
+ * 2. **`livePreviewEnabled` Facet** — Global on/off switch for Live Preview
+ *    mode, enabling a "Source Mode" toggle like Obsidian.
  *
- * All decorations are cursor-aware: when the cursor enters a decorated range,
- * the raw Markdown syntax is shown. This is the defining characteristic of
- * Obsidian's "Live Preview" mode — you always see the raw source when editing,
- * but see the rendered form when reading.
+ * 3. **`editorFocusField`** — Propagates editor focus state to StateFields
+ *    that can't access `view.hasFocus` directly.
  *
- * ## Drag Suppression
+ * 4. **Enhanced WYSIWYG Tables** — Column alignment detection, header row
+ *    styling, self-providing atomic ranges, and `changeAffectsTables` skip guard.
  *
- * During mouse-drag selection, decoration rebuilds are suppressed to prevent
- * flickering (via the `dragSelectingField` StateField and `checkUpdateAction`
- * helper). When the drag ends, decorations are rebuilt with the final state.
+ * 5. **Mid-typing emphasis supplement** — Prevents bold/italic flickering
+ *    during active typing due to CommonMark flanking rules.
+ *
+ * 6. **Singleton widgets** — HR, comment indicator, and language badge widgets
+ *    are cached/reused to avoid repeated `toDOM()` calls.
+ *
+ * 7. **Image dimension cache** — Prevents iOS scroll momentum halt by
+ *    pre-sizing remounted image widgets.
  */
 
 import type { Extension } from '@codemirror/state'
@@ -90,11 +94,18 @@ import { frontmatterPlugin } from './frontmatter'
 // Cross-cutting concerns
 import { atomicRangesExt } from './atomic-ranges'
 import { dragSelectingField, dragSelectHandlers } from './drag-state'
-import { cursorPositionField } from './cursor-awareness'
+import {
+  cursorPositionField,
+  editorFocusField,
+  focusChangeEffect,
+  focusMonitorPlugin,
+  livePreviewEnabled,
+} from './cursor-awareness'
 import { hybridRenderTheme } from './theme'
 
-// Re-export the options type for convenience
+// Re-export for convenience
 export type { HybridRenderOptions }
+export { livePreviewEnabled, focusChangeEffect, editorFocusField, focusMonitorPlugin, shouldShowSource, shouldShowSourceForLine } from './cursor-awareness'
 
 /**
  * Enable hybrid Markdown rendering in the editor.
@@ -119,10 +130,16 @@ export type { HybridRenderOptions }
  *   comments: true,
  *   frontmatter: true,
  * }))
+ *
+ * // Disable Live Preview entirely (Source Mode)
+ * extensions.push(hybridRender({ livePreview: false }))
  * ```
  */
 export function hybridRender(opts: HybridRenderOptions = {}): Extension {
   const features = {
+    // Global toggle
+    livePreview: opts.livePreview ?? true,
+
     // Original features
     embedImages: opts.embedImages ?? true,
     images: opts.images ?? true,
@@ -153,11 +170,14 @@ export function hybridRender(opts: HybridRenderOptions = {}): Extension {
 
   const extensions: Extension[] = [hybridRenderTheme]
 
+  // ── Global Live Preview toggle ──────────────────────────────────────────
+  extensions.push(livePreviewEnabled.of(features.livePreview))
+
   // ── Drag suppression (always included) ──────────────────────────────────
   extensions.push(dragSelectingField, dragSelectHandlers)
 
   // ── Centralized cursor awareness (performance optimization) ────────────
-  extensions.push(cursorPositionField)
+  extensions.push(cursorPositionField, editorFocusField, focusMonitorPlugin)
 
   // ── Core features (always recommended) ──────────────────────────────────
   if (features.checkboxes) extensions.push(checkboxesPlugin)

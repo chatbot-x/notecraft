@@ -253,6 +253,8 @@ export const ADMONITION_FENCE_RE = /^(~~~+|```+)\s*ad-(\w+)\s*(?:"([^"]*)")?(?:\
 // ─── Feature Flags Type ───────────────────────────────────────────────────────
 
 export interface HybridRenderOptions {
+  /** Enable/disable Live Preview globally (Source Mode toggle). Default: true */
+  livePreview?: boolean
   /** Obsidian embed images ![[img.png|300]]. Default: true */
   embedImages?: boolean
   /** Standard markdown images ![alt](url). Default: true */
@@ -291,7 +293,7 @@ export interface HybridRenderOptions {
   admonitions?: boolean
   /** Apply heading size styling (H1-H6 font sizes). Default: true */
   headingSizes?: boolean
-  /** WYSIWYG table rendering (hide pipes, style cells). Default: true */
+  /** WYSIWYG table rendering (hide pipes, style cells, alignment). Default: true */
   tables?: boolean
   /** Footnote reference/definition styling. Default: true */
   footnotes?: boolean

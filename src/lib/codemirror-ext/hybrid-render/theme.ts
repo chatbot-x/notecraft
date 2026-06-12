@@ -491,6 +491,13 @@ export const hybridRenderTheme = EditorView.baseTheme({
     // Row-level line decoration
     padding: '0 2px',
   },
+  '.cm-hybrid-table-header': {
+    // Header row — distinct styling
+    fontWeight: '600',
+  },
+  '.cm-hybrid-table-header .cm-hybrid-table-cell': {
+    fontWeight: '600',
+  },
   '.cm-hybrid-table-separator': {
     // Visual pipe separator between cells
     opacity: '0.15',
@@ -502,6 +509,18 @@ export const hybridRenderTheme = EditorView.baseTheme({
     pointerEvents: 'none',
     borderLeft: '1px solid rgba(0, 0, 0, 0.15)',
     verticalAlign: 'middle',
+    transition: 'opacity 0.15s ease',
+  },
+  '.cm-hybrid-table-cell': {
+    // Cell content styling (used for alignment)
+    display: 'inline-block',
+    minWidth: '1em',
+  },
+  '.cm-hybrid-table-align-center': {
+    textAlign: 'center' as string,
+  },
+  '.cm-hybrid-table-align-right': {
+    textAlign: 'right' as string,
   },
   '.cm-hybrid-table-badge': {
     display: 'inline-block',
@@ -515,6 +534,31 @@ export const hybridRenderTheme = EditorView.baseTheme({
     marginRight: '4px',
     fontFamily: 'var(--font-geist-mono), monospace',
     fontWeight: '400',
+  },
+
+  // ─── Emphasis active state ──────────────────────────────────────────────
+  '.cm-hybrid-emphasis-active': {
+    // Shown when cursor is inside emphasis range — subtle indicator
+    opacity: '0.5',
+    fontSize: '0.85em',
+    transition: 'opacity 0.15s ease',
+  },
+  '.cm-hybrid-strikethrough-active': {
+    opacity: '0.5',
+    fontSize: '0.85em',
+    transition: 'opacity 0.15s ease',
+  },
+
+  // ─── Mid-typing emphasis supplement styling ──────────────────────────────
+  '.cm-hybrid-strong': {
+    fontWeight: '700',
+  },
+  '.cm-hybrid-em': {
+    fontStyle: 'italic',
+  },
+  '.cm-hybrid-strike': {
+    textDecoration: 'line-through',
+    opacity: '0.7',
   },
 
   // ─── Footnotes ──────────────────────────────────────────────────────────
@@ -682,6 +726,23 @@ export const hybridRenderTheme = EditorView.baseTheme({
   '&dark .cm-hybrid-table-badge': {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     color: '#aaa',
+  },
+  '&dark .cm-hybrid-table-header': {
+    color: '#ddd',
+  },
+
+  // ─── Dark mode: emphasis active ────────────────────────────────────────
+  '&dark .cm-hybrid-emphasis-active': {
+    opacity: '0.6',
+  },
+  '&dark .cm-hybrid-strikethrough-active': {
+    opacity: '0.6',
+  },
+  '&dark .cm-hybrid-strong': {
+    color: '#e0e0e0',
+  },
+  '&dark .cm-hybrid-strike': {
+    opacity: '0.6',
   },
 
   // ─── Dark mode: footnotes ──────────────────────────────────────────────

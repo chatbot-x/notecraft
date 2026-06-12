@@ -1,25 +1,11 @@
 /**
- * Frontmatter decoration plugin — StateField implementation.
+ * Frontmatter decoration plugin — Enhanced Edition.
  *
- * Collapses YAML frontmatter blocks in Live Preview mode, showing a toggle
- * widget instead of the raw YAML. This matches Obsidian's behavior where
- * frontmatter is collapsed by default with a clickable toggle to expand.
+ * Collapses YAML frontmatter blocks in Live Preview mode.
  *
- * ## Why StateField?
+ * ## Enhancement
  *
- * The frontmatter collapse uses `Decoration.replace({ block: true })` which
- * changes the vertical block structure. Block-changing decorations MUST be
- * provided via StateField for correct viewport computation.
- *
- * ## Level 2: Tree-based frontmatter detection
- *
- * With the Lezer Frontmatter extension active, the syntax tree contains
- * `Frontmatter`, `FrontmatterMark`, and `FrontmatterContent` nodes. This
- * plugin now uses the tree to detect frontmatter instead of manual regex
- * line-by-line scanning, which is more reliable and benefits from incremental
- * parsing.
- *
- * Falls back to regex scanning if the tree doesn't contain Frontmatter nodes.
+ * Uses `shouldShowSource()` for consistent cursor-awareness.
  */
 
 import {
@@ -30,12 +16,9 @@ import {
 } from '@codemirror/view'
 import { StateField, StateEffect, type Range, type Transaction } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
-import { isCursorInRange } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { dragSelectingField } from './drag-state'
 
-// ─── Toggle State Effect ──────────────────────────────────────────────────────
-
-/** Effect to toggle frontmatter expanded/collapsed state */
 export const toggleFrontmatter = StateEffect.define<void>()
 
 // ─── Widget: Collapsed Frontmatter ────────────────────────────────────────────
@@ -57,7 +40,7 @@ class CollapsedFrontmatterWidget extends WidgetType {
 
     const toggle = document.createElement('span')
     toggle.className = 'cm-hybrid-frontmatter-toggle'
-    toggle.textContent = '\u25B8' // ▸ right-pointing triangle
+    toggle.textContent = '\u25B8'
 
     const label = document.createElement('span')
     label.className = 'cm-hybrid-frontmatter-label'
@@ -77,11 +60,9 @@ class CollapsedFrontmatterWidget extends WidgetType {
   }
 
   ignoreEvent(): boolean {
-    return false // Allow click to toggle
+    return false
   }
 }
-
-// ─── Widget: Expanded Frontmatter ─────────────────────────────────────────────
 
 class ExpandedFrontmatterWidget extends WidgetType {
   constructor(readonly keyCount: number) { super() }
@@ -96,7 +77,7 @@ class ExpandedFrontmatterWidget extends WidgetType {
 
     const toggle = document.createElement('span')
     toggle.className = 'cm-hybrid-frontmatter-toggle'
-    toggle.textContent = '\u25BE' // ▾ down-pointing triangle
+    toggle.textContent = '\u25BE'
 
     const label = document.createElement('span')
     label.className = 'cm-hybrid-frontmatter-label'
@@ -126,7 +107,7 @@ function parseFrontmatterKeys(state: import('@codemirror/state').EditorState, fr
   return keys
 }
 
-// ─── Find Frontmatter (Tree-based) ───────────────────────────────────────────
+// ─── Find Frontmatter ────────────────────────────────────────────────────────
 
 interface FrontmatterInfo {
   from: number
@@ -135,21 +116,19 @@ interface FrontmatterInfo {
 }
 
 function findFrontmatter(state: import('@codemirror/state').EditorState): FrontmatterInfo | null {
-  // Try tree-based detection first
   const tree = syntaxTree(state)
   let fmInfo: FrontmatterInfo | null = null
 
   tree.iterate({
     from: 0,
-    to: Math.min(state.doc.length, 5000), // frontmatter is always near doc start
+    to: Math.min(state.doc.length, 5000),
     enter(node) {
       if (node.name === 'Frontmatter') {
         const from = node.from
         const to = node.to
 
-        // Find FrontmatterContent child to extract keys
-        let contentFrom = from + 3 // after opening ---
-        let contentTo = to - 3 // before closing ---
+        let contentFrom = from + 3
+        let contentTo = to - 3
 
         node.node.cursor().iterate((child) => {
           if (child.name === 'FrontmatterContent') {
@@ -161,14 +140,13 @@ function findFrontmatter(state: import('@codemirror/state').EditorState): Frontm
 
         const keys = parseFrontmatterKeys(state, contentFrom, contentTo)
         fmInfo = { from, to, keys }
-        return // stop iterating
       }
     },
   })
 
   if (fmInfo) return fmInfo
 
-  // ── Fallback: regex line-by-line scanning ─────────────────────────────────
+  // Fallback: regex line-by-line scanning
   const doc = state.doc
   if (doc.length === 0) return null
 
@@ -208,8 +186,7 @@ function buildFrontmatterDecorations(
 
   if (!fm) return Decoration.none
 
-  // If cursor is inside the frontmatter, show it raw
-  if (isCursorInRange(state, fm.from, fm.to)) {
+  if (shouldShowSource(state, fm.from, fm.to)) {
     const firstLine = state.doc.lineAt(fm.from)
     ranges.push(
       Decoration.line({
@@ -220,7 +197,6 @@ function buildFrontmatterDecorations(
   }
 
   if (expanded) {
-    // Show the frontmatter but add an "expanded" header widget before it
     ranges.push(
       Decoration.widget({
         widget: new ExpandedFrontmatterWidget(fm.keys.length),
@@ -228,7 +204,6 @@ function buildFrontmatterDecorations(
         side: -1,
       }).range(fm.from)
     )
-    // Add line decorations to all frontmatter lines
     for (let pos = fm.from; pos <= fm.to; ) {
       const line = state.doc.lineAt(pos)
       ranges.push(
@@ -239,7 +214,6 @@ function buildFrontmatterDecorations(
       pos = line.to + 1
     }
   } else {
-    // Collapsed — replace the entire frontmatter with a collapsed widget
     ranges.push(
       Decoration.replace({
         widget: new CollapsedFrontmatterWidget(fm.keys.length, fm.keys.slice(0, 3)),
@@ -253,10 +227,6 @@ function buildFrontmatterDecorations(
 
 // ─── StateField ───────────────────────────────────────────────────────────────
 
-/**
- * StateField tracking whether the frontmatter is expanded.
- * Starts collapsed (matching Obsidian default behavior).
- */
 const frontmatterExpandedField = StateField.define<boolean>({
   create() { return false },
   update(value, tr) {
@@ -267,9 +237,6 @@ const frontmatterExpandedField = StateField.define<boolean>({
   },
 })
 
-/**
- * StateField for frontmatter decorations.
- */
 export const frontmatterField = StateField.define<DecorationSet>({
   create(state) {
     return buildFrontmatterDecorations(state, false)
@@ -277,14 +244,12 @@ export const frontmatterField = StateField.define<DecorationSet>({
   update(deco, tr) {
     const expanded = tr.state.field(frontmatterExpandedField, false) ?? false
 
-    // Check for toggle effect
     for (const effect of tr.effects) {
       if (effect.is(toggleFrontmatter)) {
         return buildFrontmatterDecorations(tr.state, expanded)
       }
     }
 
-    // Check update action
     const action = checkFieldAction(tr)
     if (action === 'rebuild') {
       return buildFrontmatterDecorations(tr.state, expanded)
@@ -312,9 +277,6 @@ function checkFieldAction(tr: Transaction): 'rebuild' | 'skip' | 'none' {
   return 'none'
 }
 
-/**
- * Extension that handles clicks on the frontmatter toggle widget.
- */
 export const frontmatterClickHandler = EditorView.domEventHandlers({
   click(event, view) {
     const target = event.target as HTMLElement
@@ -330,10 +292,6 @@ export const frontmatterClickHandler = EditorView.domEventHandlers({
   },
 })
 
-/**
- * Combined frontmatter extension — includes the expanded state field,
- * decoration field, and click handler.
- */
 export const frontmatterPlugin = [
   frontmatterExpandedField,
   frontmatterField,

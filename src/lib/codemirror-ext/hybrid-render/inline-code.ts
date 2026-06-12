@@ -1,10 +1,12 @@
 /**
- * Inline code decoration plugin.
+ * Inline code decoration plugin — Enhanced Edition.
  *
  * Adds a subtle background class to inline code spans (`code`).
  * Hides backtick delimiters when cursor is outside the code span.
  *
- * Uses the lezer syntax tree to find InlineCode nodes.
+ * ## Enhancement
+ *
+ * Uses `shouldShowSource()` for consistent cursor-awareness.
  */
 
 import {
@@ -16,7 +18,8 @@ import {
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
-import { inlineCodeMark, hiddenMark, isCursorInRange } from './shared'
+import { inlineCodeMark, hiddenMark } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
 
 function buildInlineCodeDecorations(view: EditorView): DecorationSet {
@@ -32,14 +35,13 @@ function buildInlineCodeDecorations(view: EditorView): DecorationSet {
           const codeFrom = node.from
           const codeTo = node.to
 
-          if (isCursorInRange(state, codeFrom, codeTo)) {
-            // Cursor inside — just style, don't hide backticks
-            ranges.push(inlineCodeMark.range(codeFrom, codeTo))
+          // Style the whole span always
+          ranges.push(inlineCodeMark.range(codeFrom, codeTo))
+
+          if (shouldShowSource(state, codeFrom, codeTo)) {
+            // Cursor inside — show backticks, add active styling
             return
           }
-
-          // Style the whole span
-          ranges.push(inlineCodeMark.range(codeFrom, codeTo))
 
           // Hide opening backtick(s)
           const text = state.doc.sliceString(codeFrom, codeTo)

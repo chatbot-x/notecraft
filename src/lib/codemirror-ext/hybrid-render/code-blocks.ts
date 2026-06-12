@@ -1,12 +1,14 @@
 /**
- * Code blocks decoration plugin.
+ * Code blocks decoration plugin — Enhanced Edition.
  *
  * Applies line decorations to fenced code blocks:
- * - Adds a subtle background to all code block lines
- * - Adds a language badge at the top of the code block
- * - Hides the fence markers (```) when cursor is outside the code block
+ * - Subtle background for all code block lines
+ * - Language badge at the top
+ * - Hides fence markers when cursor is outside
  *
- * Uses the lezer syntax tree to find FencedCode nodes.
+ * ## Enhancement
+ *
+ * Uses `shouldShowSource()` for consistent cursor-awareness.
  */
 
 import {
@@ -19,10 +21,17 @@ import {
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
-import { hiddenMark, isCursorInRange } from './shared'
+import { hiddenMark } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
 
-// ─── Widget: Language Badge ───────────────────────────────────────────────────
+// ─── Widget: Language Badge (Singleton per language) ─────────────────────────
+
+/**
+ * Cache of language badge widgets. Since badges are stateless (just display
+ * the language name), we reuse instances. (Pattern from Atomic Editor.)
+ */
+const badgeCache = new Map<string, LangBadgeWidget>()
 
 class LangBadgeWidget extends WidgetType {
   constructor(readonly lang: string) { super() }
@@ -41,6 +50,19 @@ class LangBadgeWidget extends WidgetType {
   ignoreEvent(): boolean {
     return true
   }
+}
+
+function getLangBadge(lang: string): LangBadgeWidget {
+  let badge = badgeCache.get(lang)
+  if (!badge) {
+    badge = new LangBadgeWidget(lang)
+    badgeCache.set(lang, badge)
+    if (badgeCache.size > 100) {
+      const firstKey = badgeCache.keys().next().value
+      if (firstKey !== undefined) badgeCache.delete(firstKey)
+    }
+  }
+  return badge
 }
 
 // ─── Build Decorations ────────────────────────────────────────────────────────
@@ -62,7 +84,6 @@ function buildCodeBlockDecorations(view: EditorView): DecorationSet {
         const firstLine = doc.lineAt(blockFrom)
         const lastLine = doc.lineAt(blockTo)
 
-        // Find the language info (CodeInfo child node)
         let langInfo = ''
 
         const cursor = node.node.cursor()
@@ -74,10 +95,9 @@ function buildCodeBlockDecorations(view: EditorView): DecorationSet {
           } while (cursor.nextSibling())
         }
 
-        // Check if cursor is anywhere inside the code block
-        const cursorInBlock = isCursorInRange(state, blockFrom, blockTo)
+        const cursorInBlock = shouldShowSource(state, blockFrom, blockTo)
 
-        // ── Line decorations for all lines in the code block ────
+        // Line decorations for all lines in the code block
         for (let pos = firstLine.from; pos <= lastLine.from; ) {
           const line = doc.lineAt(pos)
           ranges.push(
@@ -88,7 +108,7 @@ function buildCodeBlockDecorations(view: EditorView): DecorationSet {
           pos = line.to + 1
         }
 
-        // ── Hide fence markers when cursor is outside ───────────
+        // Hide fence markers when cursor is outside
         if (!cursorInBlock) {
           const firstLineText = doc.sliceString(firstLine.from, firstLine.to)
           const fenceMatch = firstLineText.match(/^(~~~+|```+)/)
@@ -99,7 +119,7 @@ function buildCodeBlockDecorations(view: EditorView): DecorationSet {
             if (langInfo) {
               ranges.push(
                 Decoration.widget({
-                  widget: new LangBadgeWidget(langInfo),
+                  widget: getLangBadge(langInfo),
                   side: 1,
                 }).range(firstLine.from)
               )

@@ -1,12 +1,15 @@
 /**
- * Links and image thumbnails decoration plugin.
+ * Links and image thumbnails decoration plugin — Enhanced Edition.
  *
  * Handles standard markdown syntax:
  * - [label](url) — Underline the label, fade brackets and URL
  * - ![alt](url) — Replace entire image syntax with thumbnail widget
  *
- * Uses the lezer syntax tree for Link and Image nodes.
- * Provides atomic ranges so the cursor treats images as single units.
+ * ## Enhancements
+ *
+ * 1. Uses `shouldShowSource()` for consistent cursor-awareness
+ * 2. Image dimension caching (from Atomic Editor pattern) — prevents
+ *    iOS scroll momentum halt by pre-sizing remounted image widgets
  */
 
 import {
@@ -22,10 +25,18 @@ import type { Range } from '@codemirror/state'
 import {
   linkLabelMark,
   linkFadedMark,
-  activeMark,
-  isCursorInRange,
 } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
+
+// ─── Image Dimension Cache ───────────────────────────────────────────────────
+
+/**
+ * Session-lifetime cache for image dimensions.
+ * Prevents iOS momentum scroll halt by pre-sizing remounted image widgets.
+ * (Pattern from Atomic Editor's `dimensionCache`.)
+ */
+const dimensionCache = new Map<string, { w: number; h: number }>()
 
 // ─── Widget: Image Thumbnail ──────────────────────────────────────────────────
 
@@ -48,6 +59,23 @@ class ImageThumbnailWidget extends WidgetType {
     img.alt = this.alt
     img.className = 'cm-hybrid-image-thumb'
     img.loading = 'lazy'
+
+    // Pre-set dimensions from cache (prevents layout shift on remount)
+    const cached = dimensionCache.get(this.url)
+    if (cached) {
+      img.width = cached.w
+      img.height = cached.h
+    }
+
+    img.onload = () => {
+      // Cache dimensions for future remounts
+      dimensionCache.set(this.url, { w: img.naturalWidth, h: img.naturalHeight })
+      // Evict old entries if cache grows too large
+      if (dimensionCache.size > 200) {
+        const firstKey = dimensionCache.keys().next().value
+        if (firstKey !== undefined) dimensionCache.delete(firstKey)
+      }
+    }
 
     img.onerror = () => {
       container.classList.add('cm-hybrid-image-error')
@@ -77,8 +105,12 @@ function buildLinkDecorations(view: EditorView): DecorationSet {
       enter(node) {
         // ── Images: ![alt](url) ────────────────────────────────
         if (node.name === 'Image') {
-          if (isCursorInRange(state, node.from, node.to)) {
-            ranges.push(activeMark.range(node.from, node.to))
+          if (shouldShowSource(state, node.from, node.to)) {
+            ranges.push(
+              Decoration.mark({
+                class: 'cm-hybrid-active',
+              }).range(node.from, node.to)
+            )
             return
           }
 
@@ -99,7 +131,7 @@ function buildLinkDecorations(view: EditorView): DecorationSet {
 
         // ── Links: [label](url) ────────────────────────────────
         if (node.name === 'Link') {
-          if (isCursorInRange(state, node.from, node.to)) return
+          if (shouldShowSource(state, node.from, node.to)) return
 
           const text = doc.sliceString(node.from, node.to)
 

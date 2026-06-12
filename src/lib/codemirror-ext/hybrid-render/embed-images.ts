@@ -1,19 +1,13 @@
 /**
- * Embed images decoration plugin.
+ * Embed images decoration plugin — Enhanced Edition.
  *
  * Handles Obsidian-style image embeds:
- * - ![[image.png]] / ![[image.png|300]] / ![[image.png|300x200]] — Replace
- *   the entire embed syntax with an inline image thumbnail widget.
- *   When cursor enters, raw syntax is shown.
+ * - ![[image.png]] / ![[image.png|300]] / ![[image.png|300x200]]
  *
- * ## Level 2: Tree-based scanning
+ * ## Enhancements
  *
- * With the Lezer Embed extension active, the syntax tree contains
- * `Embed`, `EmbedMark`, and `EmbedTarget` nodes. This plugin now scans the tree
- * for Embed nodes where the target IS an image path, and replaces them
- * with image thumbnail widgets.
- *
- * Falls back to regex scanning if the tree doesn't contain these nodes.
+ * 1. Uses `shouldShowSource()` for consistent cursor-awareness
+ * 2. Image dimension caching for smooth remount behavior
  */
 
 import {
@@ -28,15 +22,18 @@ import type { Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import {
   hiddenMark,
-  activeMark,
   embedLabelMark,
-  isCursorInRange,
   isImagePath,
   EMBED_IMAGE_RE,
   collectSkipRanges,
   isInRangeList,
 } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
+
+// ─── Image Dimension Cache (shared with links.ts) ────────────────────────────
+
+const dimensionCache = new Map<string, { w: number; h: number }>()
 
 // ─── Widget: Embed Image Thumbnail ───────────────────────────────────────────
 
@@ -73,9 +70,21 @@ class EmbedImageWidget extends WidgetType {
     if (this.filename.startsWith('data:')) {
       img.src = this.filename
     } else {
+      // Pre-set dimensions from cache
+      const cached = dimensionCache.get(this.filename)
+      if (cached && !this.width) {
+        img.width = cached.w
+        img.height = cached.h
+      }
       img.dataset.embedSrc = this.filename
       container.classList.add('cm-hybrid-image-pending')
       img.src = ''
+    }
+
+    img.onload = () => {
+      if (!this.filename.startsWith('data:')) {
+        dimensionCache.set(this.filename, { w: img.naturalWidth, h: img.naturalHeight })
+      }
     }
 
     img.onerror = () => {
@@ -108,14 +117,17 @@ function buildEmbedImageDecorations(view: EditorView): DecorationSet {
       from,
       to,
       enter(node) {
-        // ── Embed: ![[image.png|300]] ────────────────────────
         if (node.name === 'Embed') {
           usedTree = true
           const start = node.from
           const end = node.to
 
-          if (isCursorInRange(state, start, end)) {
-            ranges.push(activeMark.range(start, end))
+          if (shouldShowSource(state, start, end)) {
+            ranges.push(
+              Decoration.mark({
+                class: 'cm-hybrid-active',
+              }).range(start, end)
+            )
             return
           }
 
@@ -128,13 +140,11 @@ function buildEmbedImageDecorations(view: EditorView): DecorationSet {
             return false
           })
 
-          // Parse target: might be "image.png|300" or "note#heading|label"
           const pipeIdx = targetText.indexOf('|')
           const filePath = pipeIdx > -1 ? targetText.slice(0, pipeIdx) : targetText
           const sizeSpec = pipeIdx > -1 ? targetText.slice(pipeIdx + 1) : undefined
 
           if (isImagePath(filePath)) {
-            // Image embed — replace with thumbnail widget
             let width: number | undefined
             let height: number | undefined
             if (sizeSpec) {
@@ -151,13 +161,11 @@ function buildEmbedImageDecorations(view: EditorView): DecorationSet {
             )
           } else {
             // Non-image embed — show as styled link
-            // Hide the ![[ and ]] marks, show target with label style
             node.node.cursor().iterate((child) => {
               if (child.name === 'EmbedMark') {
                 ranges.push(hiddenMark.range(child.from, child.to))
               }
               if (child.name === 'EmbedTarget') {
-                // Show only the file path part (before |)
                 if (pipeIdx > -1) {
                   ranges.push(embedLabelMark.range(child.from, child.from + filePath.length))
                   ranges.push(hiddenMark.range(child.from + filePath.length, child.to))
@@ -174,16 +182,14 @@ function buildEmbedImageDecorations(view: EditorView): DecorationSet {
     })
   }
 
-  // If tree had Embed nodes, we're done
   if (usedTree) return Decoration.set(ranges, true)
 
-  // ── Fallback: regex scanning (if Lezer extension not loaded) ─────────────
+  // ── Fallback: regex scanning ────────────────────────────────────────────
   const doc = state.doc
   for (const { from, to } of view.visibleRanges) {
     const skipRanges = collectSkipRanges(state, from, to)
     const visibleText = doc.sliceString(from, to)
 
-    // ── Embed images: ![[image.png|300]] ────────────────────────
     EMBED_IMAGE_RE.lastIndex = 0
     let match: RegExpExecArray | null
 
@@ -198,8 +204,12 @@ function buildEmbedImageDecorations(view: EditorView): DecorationSet {
 
       if (!isImagePath(filename)) continue
 
-      if (isCursorInRange(state, start, end)) {
-        ranges.push(activeMark.range(start, end))
+      if (shouldShowSource(state, start, end)) {
+        ranges.push(
+          Decoration.mark({
+            class: 'cm-hybrid-active',
+          }).range(start, end)
+        )
         continue
       }
 
@@ -241,7 +251,6 @@ export const embedImagesPlugin = ViewPlugin.fromClass(
   },
   {
     decorations: (v) => v.decorations,
-    // Provide atomic ranges so cursor jumps over decorated embeds
     provide: (plugin) =>
       EditorView.atomicRanges.of((view) => {
         return view.plugin(plugin)?.decorations || Decoration.none

@@ -1,21 +1,11 @@
 /**
- * Callouts decoration plugin.
+ * Callouts decoration plugin — Enhanced Edition.
  *
  * Applies line decorations to Obsidian-style callout blocks (> [!note], > [!warning]+)
- * in the editor. This adds visual styling (left border, background tint) to callout
- * lines so they stand out even in Live Preview mode.
  *
- * The callout header [!type] is styled as a badge, and foldable indicators (+/-)
- * are visually marked.
+ * ## Enhancement
  *
- * ## Level 2: Tree-based scanning
- *
- * With the Lezer Callout extension active, the syntax tree contains `Callout`,
- * `CalloutMark`, `CalloutType`, and `CalloutFoldMark` nodes. This plugin now
- * scans the tree for Callout nodes and uses the node positions to apply
- * decorations, which is more reliable than regex line-by-line scanning.
- *
- * Falls back to regex scanning if the tree doesn't contain Callout nodes.
+ * Uses `shouldShowSourceForLine()` for consistent cursor-awareness.
  */
 
 import {
@@ -27,10 +17,9 @@ import {
 } from '@codemirror/view'
 import type { Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
-import { isCursorOnLine, CALLOUT_TYPES, TYPE_ALIASES } from './shared'
+import { CALLOUT_TYPES, TYPE_ALIASES } from './shared'
+import { shouldShowSourceForLine } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
-
-// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
 
 function buildCalloutDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
@@ -49,7 +38,6 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
         if (node.name === 'Callout') {
           usedTree = true
 
-          // Extract type and fold info from children
           let typeText = ''
           let hasFold = false
           let foldChar = ''
@@ -69,8 +57,6 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
               foldChar = state.doc.sliceString(child.from, child.to)
             }
             if (child.name === 'CalloutMark') {
-              // First mark is [!, second mark is ]
-              // We want the range from [! to ]
               if (markStart === node.from) {
                 markStart = child.from
               }
@@ -87,8 +73,7 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
           const lineFrom = line.from
           const lineTo = line.to
 
-          if (!isCursorOnLine(state, lineFrom, lineTo)) {
-            // Line decoration for the callout header line
+          if (!shouldShowSourceForLine(state, lineFrom, lineTo)) {
             ranges.push(
               Decoration.line({
                 class: `cm-hybrid-callout cm-hybrid-callout-${resolvedType}`,
@@ -100,7 +85,6 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
               }).range(lineFrom)
             )
 
-            // Mark decoration for [!type]
             ranges.push(
               Decoration.mark({
                 class: `cm-hybrid-callout-marker cm-hybrid-callout-marker-${resolvedType}`,
@@ -108,7 +92,6 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
               }).range(markStart, markEnd + (hasFold ? 1 : 0))
             )
 
-            // Fade the > prefix
             const lineText = line.text
             const prefixMatch = lineText.match(/^(\s*>\s*)/)
             if (prefixMatch) {
@@ -119,14 +102,14 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
             }
           }
 
-          // Apply line decorations to subsequent blockquote lines in this callout
+          // Apply line decorations to subsequent blockquote lines
           let nextLineNum = line.number + 1
           while (nextLineNum <= doc.lines) {
             const nextLine = doc.line(nextLineNum)
             const nextText = nextLine.text
             if (!nextText.match(/^\s*>\s/)) break
 
-            if (!isCursorOnLine(state, nextLine.from, nextLine.to)) {
+            if (!shouldShowSourceForLine(state, nextLine.from, nextLine.to)) {
               ranges.push(
                 Decoration.line({
                   class: `cm-hybrid-callout cm-hybrid-callout-${resolvedType} cm-hybrid-callout-body`,
@@ -152,7 +135,6 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
     })
   }
 
-  // If tree had Callout nodes, we're done
   if (usedTree) return Decoration.set(ranges, true)
 
   // ── Fallback: regex line-by-line scanning ────────────────────────────────
@@ -182,7 +164,7 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
       const headerLineFrom = lineOffset
       const headerLineTo = lineOffset + line.length
 
-      if (!isCursorOnLine(state, headerLineFrom, headerLineTo)) {
+      if (!shouldShowSourceForLine(state, headerLineFrom, headerLineTo)) {
         ranges.push(
           Decoration.line({
             class: `cm-hybrid-callout cm-hybrid-callout-${resolvedType}`,
@@ -214,7 +196,7 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
         }
       }
 
-      // Apply line decorations to subsequent blockquote lines in this callout
+      // Subsequent blockquote lines
       let j = i + 1
       while (j < lines.length) {
         const nextLine = lines[j]
@@ -223,7 +205,7 @@ function buildCalloutDecorations(view: EditorView): DecorationSet {
         const nextLineFrom = lineOffset + line.length + 1
         const nextLineTo = nextLineFrom + nextLine.length
 
-        if (!isCursorOnLine(state, nextLineFrom, nextLineTo)) {
+        if (!shouldShowSourceForLine(state, nextLineFrom, nextLineTo)) {
           ranges.push(
             Decoration.line({
               class: `cm-hybrid-callout cm-hybrid-callout-${resolvedType} cm-hybrid-callout-body`,

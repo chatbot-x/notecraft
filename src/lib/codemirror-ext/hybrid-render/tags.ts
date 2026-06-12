@@ -1,23 +1,11 @@
 /**
- * Tags decoration plugin.
+ * Tags decoration plugin — Enhanced Edition.
  *
- * Renders Obsidian-style inline tags (#tag, #nested/tag) as styled badges
- * in the editor, matching the visual appearance of the read-mode tag rendering.
- * Tags must start with a letter or underscore after #, and can contain
- * letters, digits, underscores, hyphens, and forward slashes.
+ * Renders Obsidian-style inline tags (#tag, #nested/tag) as styled badges.
  *
- * Provides atomic ranges so the cursor treats tags as single units.
+ * ## Enhancement
  *
- * ## Level 2: Tree-based scanning
- *
- * With the Lezer Tag extension active, the syntax tree contains `Tag`,
- * `TagMark`, and `TagName` nodes. This plugin now scans the tree instead
- * of using regex, which:
- * - Eliminates the #tag vs #heading disambiguation problem
- * - Removes the need for skip-range checks (code blocks are not in the tree)
- * - Provides incremental parsing benefits
- *
- * Falls back to regex scanning if the tree doesn't contain Tag nodes.
+ * Uses `shouldShowSource()` for consistent cursor-awareness.
  */
 
 import {
@@ -31,14 +19,12 @@ import type { Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import {
   tagMark,
-  isCursorInRange,
   TAG_RE,
   collectSkipRanges,
   isInRangeList,
 } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
-
-// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
 
 function buildTagDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
@@ -58,20 +44,17 @@ function buildTagDecorations(view: EditorView): DecorationSet {
           const start = node.from
           const end = node.to
 
-          // Skip if cursor is inside the tag
-          if (isCursorInRange(state, start, end)) return
+          if (shouldShowSource(state, start, end)) return
 
-          // Style the entire #tag as a badge
           ranges.push(tagMark.range(start, end))
         }
       },
     })
   }
 
-  // If tree had Tag nodes, we're done
   if (usedTree) return Decoration.set(ranges, true)
 
-  // ── Fallback: regex scanning (if Lezer extension not loaded) ─────────────
+  // ── Fallback: regex scanning ────────────────────────────────────────────
   const doc = state.doc
   for (const { from, to } of view.visibleRanges) {
     const skipRanges = collectSkipRanges(state, from, to)
@@ -93,7 +76,7 @@ function buildTagDecorations(view: EditorView): DecorationSet {
         continue
       }
 
-      if (isCursorInRange(state, hashPos, tagEnd)) continue
+      if (shouldShowSource(state, hashPos, tagEnd)) continue
 
       ranges.push(tagMark.range(hashPos, tagEnd))
     }
@@ -119,7 +102,6 @@ export const tagsPlugin = ViewPlugin.fromClass(
   },
   {
     decorations: (v) => v.decorations,
-    // Provide atomic ranges so cursor jumps over tags
     provide: (plugin) =>
       EditorView.atomicRanges.of((view) => {
         return view.plugin(plugin)?.decorations || Decoration.none

@@ -1,23 +1,11 @@
 /**
- * Math decoration plugin — dual architecture.
+ * Math decoration plugin — Enhanced Edition.
  *
  * Handles inline ($...$) and display ($$...$$) math with KaTeX rendering.
  *
- * ## Architecture
+ * ## Enhancement
  *
- * - **Inline math** uses a ViewPlugin with `Decoration.mark()` to hide `$`
- *   delimiters and style the content. This is fine as a ViewPlugin because
- *   it doesn't change the block structure.
- *
- * - **Display math** uses a StateField with `Decoration.replace({ block: true })`.
- *   Display math can span multiple lines and introduces block-level widgets,
- *   so it MUST be provided via StateField for correct viewport computation.
- *
- * ## KaTeX Loading
- *
- * KaTeX is lazy-loaded on first use. The first render shows styled raw LaTeX,
- * then triggers an async import. On the next rebuild, the cached module is
- * available and KaTeX renders the pretty output.
+ * Uses `shouldShowSource()` for consistent cursor-awareness.
  */
 
 import {
@@ -31,12 +19,11 @@ import {
 import { StateField, type Range, type Transaction } from '@codemirror/state'
 import {
   hiddenMark,
-  activeMark,
   mathMark,
-  isCursorInRange,
   INLINE_MATH_RE,
   DISPLAY_MATH_RE,
 } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction, dragSelectingField } from './drag-state'
 
 // ─── KaTeX Module Cache ───────────────────────────────────────────────────────
@@ -52,14 +39,14 @@ async function getKaTeX(): Promise<any> {
     katexModule = mod.default
     return katexModule
   }).catch(() => {
-    katexLoadPromise = null // Allow retry
+    katexLoadPromise = null
     return null
   })
 
   return katexLoadPromise
 }
 
-// ─── Widget: Math Preview (for display math) ──────────────────────────────────
+// ─── Widget: Math Preview ─────────────────────────────────────────────────────
 
 class MathPreviewWidget extends WidgetType {
   constructor(
@@ -77,7 +64,6 @@ class MathPreviewWidget extends WidgetType {
       ? 'cm-hybrid-math-display'
       : 'cm-hybrid-math-inline'
 
-    // Try synchronous KaTeX rendering
     if (katexModule) {
       try {
         container.innerHTML = katexModule.renderToString(this.latex, {
@@ -90,11 +76,9 @@ class MathPreviewWidget extends WidgetType {
       }
     }
 
-    // KaTeX not loaded yet or failed — show styled raw LaTeX
     container.textContent = this.latex
     container.classList.add('cm-hybrid-math-raw')
 
-    // Trigger async KaTeX load so next render will be pretty
     getKaTeX()
 
     return container
@@ -111,7 +95,6 @@ function buildDisplayMathDecorations(state: import('@codemirror/state').EditorSt
   const ranges: Range<Decoration>[] = []
   const doc = state.doc
 
-  // Display math can appear anywhere in the document
   DISPLAY_MATH_RE.lastIndex = 0
   let match: RegExpExecArray | null
 
@@ -120,8 +103,12 @@ function buildDisplayMathDecorations(state: import('@codemirror/state').EditorSt
     const end = start + match[0].length
     const latex = match[1]
 
-    if (isCursorInRange(state, start, end)) {
-      ranges.push(activeMark.range(start, end))
+    if (shouldShowSource(state, start, end)) {
+      ranges.push(
+        Decoration.mark({
+          class: 'cm-hybrid-active',
+        }).range(start, end)
+      )
       continue
     }
 
@@ -151,11 +138,6 @@ function checkFieldAction(tr: Transaction): 'rebuild' | 'skip' | 'none' {
   return 'none'
 }
 
-/**
- * StateField for display math ($$...$$) rendering.
- *
- * Uses block-level replace decorations, so must be a StateField.
- */
 export const displayMathField = StateField.define<DecorationSet>({
   create(state) {
     return buildDisplayMathDecorations(state)
@@ -193,12 +175,15 @@ function buildInlineMathDecorations(view: EditorView): DecorationSet {
       const end = start + fullMatch.length - precedingChar.length
       const latex = match[1]
 
-      if (isCursorInRange(state, start, end)) {
-        ranges.push(activeMark.range(start, end))
+      if (shouldShowSource(state, start, end)) {
+        ranges.push(
+          Decoration.mark({
+            class: 'cm-hybrid-active',
+          }).range(start, end)
+        )
         continue
       }
 
-      // Hide the $ delimiters, style the content
       ranges.push(hiddenMark.range(start, start + 1))
       ranges.push(mathMark.range(start + 1, end - 1))
       ranges.push(hiddenMark.range(end - 1, end))
@@ -208,11 +193,6 @@ function buildInlineMathDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true)
 }
 
-/**
- * ViewPlugin for inline math ($...$) rendering.
- *
- * Uses mark decorations only, so ViewPlugin is fine.
- */
 export const inlineMathPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
@@ -227,7 +207,6 @@ export const inlineMathPlugin = ViewPlugin.fromClass(
       if (action === 'rebuild') {
         this.decorations = buildInlineMathDecorations(update.view)
       }
-      // If KaTeX was loaded after initial render, force a re-render
       if (!this.katexLoaded && katexModule) {
         this.katexLoaded = true
         this.decorations = buildInlineMathDecorations(update.view)
@@ -248,10 +227,6 @@ export const inlineMathPlugin = ViewPlugin.fromClass(
   }
 )
 
-/**
- * Combined math plugin array — for backward compatibility and simpler registration.
- * Returns both the display math StateField and the inline math ViewPlugin.
- */
 export const mathPlugin: import('@codemirror/state').Extension[] = [
   displayMathField,
   inlineMathPlugin,

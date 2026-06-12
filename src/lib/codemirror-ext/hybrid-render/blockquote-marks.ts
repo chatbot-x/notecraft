@@ -1,17 +1,12 @@
 /**
- * Blockquote marks decoration plugin.
+ * Blockquote marks decoration plugin — Enhanced Edition.
  *
  * Fades the `>` markers on blockquote lines when the cursor is not on that line.
- * This mirrors Obsidian's Live Preview where blockquote markers are subtle.
  *
- * Note: Callout blocks (> [!note]) are handled by the callouts plugin with
- * their own styling. This plugin only handles regular blockquotes.
+ * ## Enhancement
  *
- * ## Level 2: Tree-aware callout skipping
- *
- * With the Lezer Callout extension active, this plugin can detect callout
- * lines by checking for `Callout` sibling nodes, rather than using a regex
- * check on the line text. Falls back to regex if no Callout nodes are found.
+ * Uses `shouldShowSourceForLine()` for consistent cursor-awareness with
+ * drag-suppression and focus awareness.
  */
 
 import {
@@ -23,7 +18,8 @@ import {
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
-import { quoteMarkFaded, isCursorOnLine } from './shared'
+import { quoteMarkFaded } from './shared'
+import { shouldShowSourceForLine } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
 
 function buildBlockquoteMarkDecorations(view: EditorView): DecorationSet {
@@ -58,13 +54,13 @@ function buildBlockquoteMarkDecorations(view: EditorView): DecorationSet {
         )
         if (inCallout) return
 
-        // Fallback: skip callout headers via regex (for when Lezer extension not loaded)
+        // Fallback: skip callout headers via regex
         const line = doc.lineAt(node.from)
         const lineText = doc.sliceString(line.from, line.to)
         if (lineText.match(/^\s*>\s*\[!/)) return
 
-        // Only fade when cursor is not on this line
-        if (isCursorOnLine(state, line.from, line.to)) return
+        // Use centralized shouldShowSourceForLine
+        if (shouldShowSourceForLine(state, line.from, line.to)) return
 
         ranges.push(quoteMarkFaded.range(node.from, node.to))
       },

@@ -67,6 +67,13 @@ export type { FinalNewlineOptions } from './final-newline'
 
 // Hybrid render (Obsidian-style Live Preview decorations)
 export { hybridRender } from './hybrid-render'
+export type { HybridRenderOptions } from './hybrid-render'
+export {
+  livePreviewEnabled,
+  shouldShowSource,
+  shouldShowSourceForLine,
+  focusMonitorPlugin,
+} from './hybrid-render'
 
 // Lezer grammar extensions (Obsidian-flavored Markdown syntax tree nodes)
 export { obsidianExtensions } from './lezer-extensions'

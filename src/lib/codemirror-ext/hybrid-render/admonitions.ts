@@ -1,28 +1,11 @@
 /**
- * Admonitions decoration plugin.
+ * Admonitions decoration plugin — Enhanced Edition.
  *
- * Handles code-block-style admonitions (~~~ad-note, ```ad-warning), which are
- * an alternative to Obsidian callout syntax. These are rendered as styled
- * callout blocks in the editor, matching the visual appearance of the callout
- * decorations from callouts.ts.
+ * Handles code-block-style admonitions (~~~ad-note, ```ad-warning).
  *
- * ## Detection
+ * ## Enhancement
  *
- * Admonitions are detected by checking FencedCode nodes whose CodeInfo child
- * starts with `ad-`. The lezer parser already handles these as code fences,
- * so we intercept them at the decoration layer.
- *
- * ## Behavior
- *
- * - The fence markers (```) and `ad-type` info string are hidden
- * - A callout-style badge replaces the type indicator
- * - Line decorations add the callout background and border
- * - When the cursor is inside the block, raw syntax is shown
- *
- * ## Type Resolution
- *
- * Admonition types follow the same alias system as callouts:
- * ad-note, ad-tip, ad-warning, ad-danger, etc.
+ * Uses `shouldShowSource()` for consistent cursor-awareness.
  */
 
 import {
@@ -34,10 +17,9 @@ import {
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
-import { hiddenMark, isCursorInRange, CALLOUT_TYPES, TYPE_ALIASES } from './shared'
+import { hiddenMark, CALLOUT_TYPES, TYPE_ALIASES } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
-
-// ─── Build Decorations ────────────────────────────────────────────────────────
 
 function buildAdmonitionDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
@@ -51,7 +33,6 @@ function buildAdmonitionDecorations(view: EditorView): DecorationSet {
       enter(node) {
         if (node.name !== 'FencedCode') return
 
-        // Find CodeInfo child
         let codeInfoFrom = -1
         let codeInfoTo = -1
         let adType = ''
@@ -70,7 +51,6 @@ function buildAdmonitionDecorations(view: EditorView): DecorationSet {
           } while (cursor.nextSibling())
         }
 
-        // Not an admonition
         if (!adType) return
 
         const resolvedType = TYPE_ALIASES[adType] ?? adType
@@ -81,9 +61,9 @@ function buildAdmonitionDecorations(view: EditorView): DecorationSet {
         const firstLine = doc.lineAt(blockFrom)
         const lastLine = doc.lineAt(blockTo)
 
-        const cursorInBlock = isCursorInRange(state, blockFrom, blockTo)
+        const cursorInBlock = shouldShowSource(state, blockFrom, blockTo)
 
-        // ── Line decorations for all lines ─────────────────────
+        // Line decorations for all lines
         for (let pos = firstLine.from; pos <= lastLine.from; ) {
           const line = doc.lineAt(pos)
           ranges.push(
@@ -95,16 +75,14 @@ function buildAdmonitionDecorations(view: EditorView): DecorationSet {
           pos = line.to + 1
         }
 
-        if (cursorInBlock) return // Show raw syntax when cursor is inside
+        if (cursorInBlock) return
 
-        // ── Hide opening fence and type info ───────────────────
+        // Hide opening fence and type info
         const firstLineText = doc.sliceString(firstLine.from, firstLine.to)
         const fenceMatch = firstLineText.match(/^(~~~+|```+)/)
         if (fenceMatch) {
-          // Hide the fence characters
           ranges.push(hiddenMark.range(firstLine.from, firstLine.from + fenceMatch[0].length))
 
-          // Add type badge
           ranges.push(
             Decoration.mark({
               class: `cm-hybrid-callout-marker cm-hybrid-callout-marker-${resolvedType}`,
@@ -113,7 +91,7 @@ function buildAdmonitionDecorations(view: EditorView): DecorationSet {
           )
         }
 
-        // ── Hide closing fence ─────────────────────────────────
+        // Hide closing fence
         const lastLineText = doc.sliceString(lastLine.from, lastLine.to)
         const closingFenceMatch = lastLineText.match(/^(~~~+|```+)/)
         if (closingFenceMatch) {

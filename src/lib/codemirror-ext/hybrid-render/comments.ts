@@ -1,24 +1,11 @@
 /**
- * Comments decoration plugin.
+ * Comments decoration plugin — Enhanced Edition.
  *
  * Handles Obsidian-style inline comments: %%comment text%%
  *
- * In Live Preview, comments are fully hidden (replaced with nothing) when the
- * cursor is not inside them. When the cursor enters the comment range, the raw
- * syntax is shown so the user can edit it.
+ * ## Enhancement
  *
- * Optionally shows a subtle indicator dot at the comment position so the user
- * knows something is there (matching Obsidian's behavior).
- *
- * ## Level 2: Tree-based scanning
- *
- * With the Lezer Comment extension active, the syntax tree contains `Comment`,
- * `CommentMark`, and `CommentContent` nodes. This plugin now scans the tree
- * instead of using regex, which eliminates false positives inside code blocks
- * and provides incremental parsing benefits.
- *
- * Falls back to regex scanning if the tree doesn't contain Comment nodes
- * (e.g., if the Lezer extension is not loaded).
+ * Uses `shouldShowSource()` for consistent cursor-awareness.
  */
 
 import {
@@ -32,19 +19,18 @@ import {
 import type { Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import {
-  activeMark,
-  isCursorInRange,
   COMMENT_RE,
   collectSkipRanges,
   isInRangeList,
 } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
 
 // ─── Widget: Comment Indicator ────────────────────────────────────────────────
 
 /**
- * A tiny dot widget shown at the position of a hidden comment,
- * so the user knows something is there without seeing the full text.
+ * A tiny dot widget shown at the position of a hidden comment.
+ * Singleton pattern — only one instance needed since it's stateless.
  */
 class CommentIndicatorWidget extends WidgetType {
   constructor() { super() }
@@ -66,7 +52,10 @@ class CommentIndicatorWidget extends WidgetType {
   }
 }
 
-// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
+/** Singleton instance — reused across all comment decorations */
+const COMMENT_INDICATOR = new CommentIndicatorWidget()
+
+// ─── Build Decorations ───────────────────────────────────────────────────────
 
 function buildCommentDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
@@ -86,14 +75,18 @@ function buildCommentDecorations(view: EditorView): DecorationSet {
           const start = node.from
           const end = node.to
 
-          if (isCursorInRange(state, start, end)) {
+          if (shouldShowSource(state, start, end)) {
             // Cursor inside — show raw syntax with active highlighting
-            ranges.push(activeMark.range(start, end))
+            ranges.push(
+              Decoration.mark({
+                class: 'cm-hybrid-active',
+              }).range(start, end)
+            )
           } else {
             // Hide the entire %%...%% and show a subtle indicator dot
             ranges.push(
               Decoration.replace({
-                widget: new CommentIndicatorWidget(),
+                widget: COMMENT_INDICATOR,
               }).range(start, end)
             )
           }
@@ -102,10 +95,9 @@ function buildCommentDecorations(view: EditorView): DecorationSet {
     })
   }
 
-  // If tree had Comment nodes, we're done
   if (usedTree) return Decoration.set(ranges, true)
 
-  // ── Fallback: regex scanning (if Lezer extension not loaded) ─────────────
+  // ── Fallback: regex scanning ────────────────────────────────────────────
   const doc = state.doc
   for (const { from, to } of view.visibleRanges) {
     const skipRanges = collectSkipRanges(state, from, to)
@@ -118,17 +110,20 @@ function buildCommentDecorations(view: EditorView): DecorationSet {
       const start = from + match.index
       const end = start + match[0].length
 
-      // Skip if inside code block or inline code
       if (isInRangeList(start, end, skipRanges)) continue
 
-      if (isCursorInRange(state, start, end)) {
-        ranges.push(activeMark.range(start, end))
+      if (shouldShowSource(state, start, end)) {
+        ranges.push(
+          Decoration.mark({
+            class: 'cm-hybrid-active',
+          }).range(start, end)
+        )
         continue
       }
 
       ranges.push(
         Decoration.replace({
-          widget: new CommentIndicatorWidget(),
+          widget: COMMENT_INDICATOR,
         }).range(start, end)
       )
     }
@@ -154,7 +149,6 @@ export const commentsPlugin = ViewPlugin.fromClass(
   },
   {
     decorations: (v) => v.decorations,
-    // Provide atomic ranges so cursor jumps over hidden comments
     provide: (plugin) =>
       EditorView.atomicRanges.of((view) => {
         return view.plugin(plugin)?.decorations || Decoration.none

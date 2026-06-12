@@ -1,26 +1,12 @@
 /**
- * Embed transclusions decoration plugin.
+ * Embed transclusions decoration plugin — Enhanced Edition.
  *
  * Handles Obsidian-style non-image embeds:
- * - ![[note]]           — Embed entire note
- * - ![[note#heading]]   — Embed note section
- * - ![[note#^block-id]] — Embed specific block
- * - ![[#heading]]       — Embed heading in current note
+ * - ![[note]] / ![[note#heading]] / ![[note#^block-id]] / ![[#heading]]
  *
- * In Live Preview, non-image embeds are replaced with a placeholder widget
- * that shows the embed target and a "Loading embed..." indicator. When the
- * cursor enters the embed range, the raw syntax is shown.
+ * ## Enhancement
  *
- * Image embeds (![[image.png|300]]) are handled by the embed-images plugin.
- *
- * ## Level 2: Tree-based scanning
- *
- * With the Lezer Embed extension active, the syntax tree contains `Embed`,
- * `EmbedMark`, and `EmbedTarget` nodes. This plugin now scans the tree
- * for Embed nodes where the target is NOT an image path, and replaces them
- * with transclusion widgets.
- *
- * Falls back to regex scanning if the tree doesn't contain Embed nodes.
+ * Uses `shouldShowSource()` for consistent cursor-awareness.
  */
 
 import {
@@ -34,13 +20,12 @@ import {
 import type { Range } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import {
-  activeMark,
   isImagePath,
   EMBED_TRANSCLUDE_RE,
-  isCursorInRange,
   collectSkipRanges,
   isInRangeList,
 } from './shared'
+import { shouldShowSource } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
 
 // ─── Widget: Embed Transclusion ───────────────────────────────────────────────
@@ -60,16 +45,14 @@ class EmbedTransclusionWidget extends WidgetType {
     container.className = 'cm-hybrid-embed-transclusion'
     container.setAttribute('data-embed-src', this.target)
 
-    // Parse the target for display
     const { noteName, heading, blockId } = parseEmbedTarget(this.target)
 
-    // Header with embed icon and target name
     const header = document.createElement('div')
     header.className = 'cm-hybrid-embed-header'
 
     const icon = document.createElement('span')
     icon.className = 'cm-hybrid-embed-icon'
-    icon.textContent = '\u2197' // ↗
+    icon.textContent = '\u2197'
 
     const name = document.createElement('span')
     name.className = 'cm-hybrid-embed-name'
@@ -94,7 +77,6 @@ class EmbedTransclusionWidget extends WidgetType {
 
     container.appendChild(header)
 
-    // Placeholder content area (to be filled by client-side handler)
     const content = document.createElement('div')
     content.className = 'cm-hybrid-embed-content'
     content.textContent = 'Loading embed\u2026'
@@ -104,7 +86,7 @@ class EmbedTransclusionWidget extends WidgetType {
   }
 
   ignoreEvent(): boolean {
-    return false // Allow click for navigation
+    return false
   }
 }
 
@@ -117,7 +99,6 @@ interface EmbedTarget {
 }
 
 function parseEmbedTarget(target: string): EmbedTarget {
-  // Handle ![[#heading]] (same-file heading reference)
   if (target.startsWith('#')) {
     const rest = target.slice(1)
     if (rest.startsWith('^')) {
@@ -126,13 +107,11 @@ function parseEmbedTarget(target: string): EmbedTarget {
     return { noteName: '', heading: rest }
   }
 
-  // Handle ![[note#^block-id]]
   const blockMatch = target.match(/^(.+?)#(\^[a-zA-Z0-9_-]+)$/)
   if (blockMatch) {
     return { noteName: blockMatch[1], blockId: blockMatch[2].slice(1) }
   }
 
-  // Handle ![[note#heading]]
   const headingMatch = target.match(/^(.+?)#(.+)$/)
   if (headingMatch) {
     return { noteName: headingMatch[1], heading: headingMatch[2] }
@@ -141,7 +120,7 @@ function parseEmbedTarget(target: string): EmbedTarget {
   return { noteName: target }
 }
 
-// ─── Build Decorations (Tree-based) ──────────────────────────────────────────
+// ─── Build Decorations ───────────────────────────────────────────────────────
 
 function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
   const ranges: Range<Decoration>[] = []
@@ -157,7 +136,6 @@ function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
       to,
       enter(node) {
         if (node.name === 'Embed') {
-          // Extract the target text from EmbedTarget child
           let targetText = ''
           node.node.cursor().iterate((child) => {
             if (child.name === 'EmbedTarget') {
@@ -166,24 +144,25 @@ function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
             return false
           })
 
-          // Parse the | separator for label/size
           const pipeIdx = targetText.indexOf('|')
           const filePath = pipeIdx > -1 ? targetText.slice(0, pipeIdx) : targetText
           const label = pipeIdx > -1 ? targetText.slice(pipeIdx + 1) : undefined
 
-          // Skip image embeds — handled by embed-images plugin
           if (isImagePath(filePath)) return
 
           usedTree = true
           const start = node.from
           const end = node.to
 
-          if (isCursorInRange(state, start, end)) {
-            ranges.push(activeMark.range(start, end))
+          if (shouldShowSource(state, start, end)) {
+            ranges.push(
+              Decoration.mark({
+                class: 'cm-hybrid-active',
+              }).range(start, end)
+            )
             return
           }
 
-          // Replace the embed syntax with a transclusion widget
           ranges.push(
             Decoration.replace({
               widget: new EmbedTransclusionWidget(filePath, label),
@@ -195,10 +174,9 @@ function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
     })
   }
 
-  // If tree had Embed nodes, we're done
   if (usedTree) return Decoration.set(ranges, true)
 
-  // ── Fallback: regex scanning (if Lezer extension not loaded) ─────────────
+  // ── Fallback: regex scanning ────────────────────────────────────────────
   const doc = state.doc
   for (const { from, to } of view.visibleRanges) {
     const skipRanges = collectSkipRanges(state, from, to)
@@ -214,11 +192,14 @@ function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
       const label = match[2]
 
       if (isInRangeList(start, end, skipRanges)) continue
-
       if (isImagePath(target)) continue
 
-      if (isCursorInRange(state, start, end)) {
-        ranges.push(activeMark.range(start, end))
+      if (shouldShowSource(state, start, end)) {
+        ranges.push(
+          Decoration.mark({
+            class: 'cm-hybrid-active',
+          }).range(start, end)
+        )
         continue
       }
 
@@ -251,7 +232,6 @@ export const embedTransclusionsPlugin = ViewPlugin.fromClass(
   },
   {
     decorations: (v) => v.decorations,
-    // Provide atomic ranges so cursor jumps over embed widgets
     provide: (plugin) =>
       EditorView.atomicRanges.of((view) => {
         return view.plugin(plugin)?.decorations || Decoration.none

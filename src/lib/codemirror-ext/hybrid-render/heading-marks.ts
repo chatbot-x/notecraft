@@ -1,5 +1,5 @@
 /**
- * Heading marks decoration plugin.
+ * Heading marks decoration plugin — Enhanced Edition.
  *
  * Hides the `#` marks on ATX headings when the cursor is not on that line.
  * This mirrors Obsidian's Live Preview behavior where heading markers are
@@ -7,7 +7,10 @@
  *
  * Also applies heading size styling (H1–H6) when headingSizes is enabled.
  *
- * Uses the lezer syntax tree to find HeaderMark and ATXHeading nodes.
+ * ## Enhancement
+ *
+ * Uses `shouldShowSourceForLine()` for consistent cursor-awareness with
+ * drag-suppression and focus awareness.
  */
 
 import {
@@ -19,7 +22,8 @@ import {
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
-import { hiddenMark, isCursorOnLine } from './shared'
+import { hiddenMark } from './shared'
+import { shouldShowSourceForLine } from './cursor-awareness'
 import { checkUpdateAction } from './drag-state'
 
 // ─── Heading Size Classes ─────────────────────────────────────────────────────
@@ -58,8 +62,8 @@ function buildHeadingMarkDecorations(view: EditorView): DecorationSet {
           const lineFrom = line.from
           const lineTo = line.to
 
-          // Only hide marks when cursor is NOT on this line
-          if (isCursorOnLine(state, lineFrom, lineTo)) return
+          // Use centralized shouldShowSourceForLine
+          if (shouldShowSourceForLine(state, lineFrom, lineTo)) return
 
           // Also hide the space after the # marks
           let markEnd = node.to
@@ -71,7 +75,6 @@ function buildHeadingMarkDecorations(view: EditorView): DecorationSet {
         }
 
         // ── Heading size styling ─────────────────────────────────
-        // Apply to ATXHeading nodes for visual hierarchy
         if (node.name.startsWith('ATXHeading')) {
           const level = headingLevel(node.name)
           if (level > 0 && HEADING_CLASSES[level]) {
