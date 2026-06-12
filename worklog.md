@@ -1,6 +1,38 @@
 # NoteCraft Worklog
 
 ---
+Task ID: 8
+Agent: Super Z (main)
+Task: Fix all 22 deep audit findings
+
+Work Log:
+- CRITICAL: Removed iframe from DOMPurify ALLOWED_TAGS (XSS vector)
+- CRITICAL: Implemented split-view scroll sync (percentage-based bidirectional)
+- CRITICAL: Removed ignoreBuildErrors, fixed all type errors, added type declarations
+- HIGH: Added React ErrorBoundary wrapping the entire app
+- HIGH: Marked inline suggestion as experimental, removed Tab/Escape shortcut claims
+- HIGH: Persisted dark mode in Zustand store (survives page reload)
+- HIGH: Implemented embed placeholder resolution — ![[note]] shows embedded content
+- MED: Close mobile sidebar on note selection
+- MED: Deduplicated image upload handler (3 copies → 1 shared)
+- MED: Used hasHydrated to show loading state before rehydration
+- MED: Fixed Mermaid securityLevel 'loose' → 'strict'
+- MED: Removed duplicate 'input' from ALLOWED_TAGS
+- MED: Enabled noImplicitAny in tsconfig + added type declaration files
+- MED: Replaced notecraft-visited localStorage with Zustand-based check
+- MED: Memoized getFilteredNotes with useMemo in sidebar
+- LOW: Added rendering indicator for preview
+- LOW: Used counter for Mermaid IDs instead of Math.random
+- LOW: Fixed module-level debounceTimer in inline-suggestion (instance-scoped)
+- LOW: Added /upload/ to .gitignore
+
+Stage Summary:
+- All 22 audit items addressed
+- Full TypeScript type checking now passes (no ignoreBuildErrors)
+- Build passes cleanly
+- Pushed to GitHub as commit 790c095
+
+---
 Task ID: 7
 Agent: Super Z (main)
 Task: Implement all 15 audit items — heading click, toast system, cleanup
