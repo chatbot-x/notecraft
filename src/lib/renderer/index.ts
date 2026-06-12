@@ -1,14 +1,13 @@
 /**
  * NoteCraft Rendering Engine — markdown-it + plugin pipeline
  *
- * Industrial-grade Markdown rendering with 24 plugins:
+ * Markdown rendering with these features:
  * - GFM (tables, strikethrough, task lists, autolinks)
  * - KaTeX math ($...$ and $$...$$)
  * - Mermaid diagrams (lazy-loaded)
  * - Obsidian-style callouts (> [!note], > [!warning]+, > [!danger]-)
  *   with foldable support, type aliases, and data attributes
  * - Code-block admonitions (~~~ad-note)
- * - Wikilinks ([[note name]], [[note#heading]], [[note|alias]])
  * - Obsidian embeds (![[note]], ![[image.png|300]], ![[note#^blockid]])
  * - Obsidian tags (#tag, #nested/tag)
  * - Obsidian block references (^block-id)
@@ -28,17 +27,6 @@
  *   markdown-it is the engine, remark is the reference implementation.
  *   We study how remark plugins handle edge cases, then implement the
  *   same logic in markdown-it's token stream model.
- *
- * Usage:
- * ```ts
- * import { renderMarkdown, renderMarkdownSync } from '@/lib/renderer'
- *
- * // Async (with Shiki highlighting)
- * const html = await renderMarkdown(markdown, { isDark: true })
- *
- * // Sync (no highlighting, for SSR or quick preview)
- * const html = renderMarkdownSync(markdown)
- * ```
  */
 
 import MarkdownIt from 'markdown-it'
@@ -79,10 +67,8 @@ import { renderFrontMatterDisplay } from './frontmatter-display'
 export interface RenderOptions {
   /** Dark mode toggle — affects Shiki theme and CSS classes. Default: false */
   isDark?: boolean
-  /** Base URL for wikilink resolution. Default: "/" */
-  wikilinkBase?: string
-  /** Called when a wikilink is clicked in the preview. Receives the page name. */
-  onWikilinkClick?: (pageName: string) => void
+  /** Base URL for embed resolution. Default: "/" */
+  embedBase?: string
   /** Called when an Obsidian tag is clicked. Receives the tag name. */
   onTagClick?: (tagName: string) => void
   /** Called when an embed note is clicked. Receives the source path. */
@@ -94,7 +80,6 @@ export interface RenderOptions {
     math?: boolean
     mermaid?: boolean
     callouts?: boolean
-    wikilinks?: boolean
     footnotes?: boolean
     taskLists?: boolean
     headingIds?: boolean
@@ -219,7 +204,7 @@ function parseYamlFrontMatter(raw: string): Record<string, unknown> {
 function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
   const features = opts.features ?? {}
   const frontMatterData: { value: Record<string, unknown> | null } = { value: null }
-  const wikilinkBase = opts.wikilinkBase ?? '/'
+  const embedBase = opts.embedBase ?? '/'
 
   const md = new MarkdownIt({
     html: true,
@@ -292,22 +277,18 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
   }
 
   // ─── Obsidian Transforms (merged core-rule pipeline) ───────────────
-  // Replaces 6 separate core rules with a single `obsidian_transforms`
-  // rule that does one walk over inline tokens (comment → wikilink →
-  // embed → tag sub-passes) then block-level transforms (callout,
-  // block-ref). This eliminates 3 full iterations over state.tokens.
+  // Single `obsidian_transforms` core rule: one inline walk
+  // (comment → embed → tag sub-passes) then block-level transforms
+  // (callout, block-ref). No ordering dependencies between sub-passes.
 
   md.use(obsidianTransforms, {
     commentStrip: true,
-    wikilinkBaseURL: wikilinkBase,
-    wikilinkURISuffix: '',
-    embedWikilinkBase: wikilinkBase,
+    embedBase,
     tagClass: 'obsidian-tag',
     blockRefIndicatorClass: 'block-ref-id',
     blockRefShowIndicator: true,
     features: {
       comments: features.comments !== false,
-      wikilinks: features.wikilinks !== false,
       embeds: features.embeds !== false,
       tags: features.tags !== false,
       callouts: features.callouts !== false,
@@ -317,7 +298,7 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
 
   // ─── Custom Renderers ────────────────────────────────────────────
 
-  // Make wikilinks use a special class for click handling
+  // Add target="_blank" for external links
   const defaultLinkOpen = md.renderer.rules.link_open ||
     function (tokens, idx, options, _env, self) {
       return self.renderToken(tokens, idx, options)
@@ -325,34 +306,11 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
 
   md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
     const href = tokens[idx].attrGet('href')
-    // Add target="_blank" for external links
     if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
       tokens[idx].attrSet('target', '_blank')
       tokens[idx].attrSet('rel', 'noopener noreferrer')
     }
-    // Mark wikilinks with a class for click handling
-    if (href && href.startsWith(wikilinkBase)) {
-      tokens[idx].attrJoin('class', 'wikilink')
-
-      // Enhanced wikilink: add data attributes for heading/block references
-      const hashIdx = href.indexOf('#')
-      if (hashIdx !== -1) {
-        const fragment = href.slice(hashIdx + 1)
-        if (fragment.startsWith('^')) {
-          // Block reference: [[note#^blockid]]
-          tokens[idx].attrSet('data-wikilink-block', fragment.slice(1))
-        } else {
-          // Heading reference: [[note#heading]]
-          tokens[idx].attrSet('data-wikilink-heading', fragment)
-        }
-      }
-    }
     return defaultLinkOpen(tokens, idx, options, env, self)
-  }
-
-  // Task list checkbox styling
-  md.renderer.rules.bullet_list_open = function (tokens, idx, options, env, self) {
-    return self.renderToken(tokens, idx, options)
   }
 
   // Store front matter on the instance for retrieval after render
@@ -394,7 +352,6 @@ function sanitizeHtml(html: string): string {
       'data-embed-src', 'data-embed-type', 'data-embed-heading', 'data-embed-block',
       'data-embed-placeholder',
       'data-block-id',
-      'data-wikilink-heading', 'data-wikilink-block',
     ],
     ADD_TAGS: ['input'],
     // Allow data: URIs for images (base64 uploads)

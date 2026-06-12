@@ -1,7 +1,7 @@
 /**
  * Shared callout type definitions — used by both callout and admonition plugins.
  *
- * Extracted from the original callout-plugin.ts and admonition-plugin.ts
+ * Extracted from the original callout and admonition plugins
  * to eliminate the duplicated CALLOUT_ICONS and TYPE_ALIASES maps.
  *
  * Backport references:

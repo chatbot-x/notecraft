@@ -1,8 +1,8 @@
 /**
- * Integration test for the merged obsidian-transforms pipeline.
+ * Integration test for the obsidian-transforms pipeline.
  *
- * Verifies that the single obsidian_transforms core rule produces
- * identical output to the original 6 separate core-rule plugins.
+ * Tests the merged obsidian_transforms core rule that handles:
+ *   Comments, Embeds, Tags, Callouts, Block References
  *
  * Run: npx tsx src/lib/renderer/obsidian-transforms.test.ts
  */
@@ -46,7 +46,6 @@ function testGroup(name: string, fn: () => void) {
 
 const md = createMd()
 const mdNoComments = createMd({ features: { comments: false } })
-const mdNoWikilinks = createMd({ features: { wikilinks: false } })
 const mdNoTags = createMd({ features: { tags: false } })
 const mdNoCallouts = createMd({ features: { callouts: false } })
 const mdNoBlockRefs = createMd({ features: { blockRefs: false } })
@@ -66,27 +65,6 @@ testGroup('Comment Plugin', () => {
   )
 })
 
-testGroup('Wikilink Plugin', () => {
-  test('basic [[note]] wikilink', md, 'See [[My Note]]', html =>
-    html.includes('class="wikilink"') && html.includes('My Note')
-  )
-  test('wikilink with heading [[note#heading]]', md, '[[Note#Intro]]', html =>
-    html.includes('data-wikilink-heading="Intro"') && html.includes('Note &gt; Intro')
-  )
-  test('wikilink with block ref [[note#^blockid]]', md, '[[Note#^abc]]', html =>
-    html.includes('data-wikilink-block="abc"')
-  )
-  test('wikilink with alias [[note|display]]', md, '[[Note|Click Here]]', html =>
-    html.includes('Click Here') && !html.includes('Note|Click Here')
-  )
-  test('current note heading [[#heading]]', md, '[[#Intro]]', html =>
-    html.includes('data-wikilink-heading="Intro"')
-  )
-  test('feature flag disables wikilinks', mdNoWikilinks, 'See [[My Note]]', html =>
-    !html.includes('class="wikilink"') && html.includes('[[My Note]]')
-  )
-})
-
 testGroup('Embed Plugin', () => {
   test('note embed ![[note]]', md, '![[My Note]]', html =>
     html.includes('data-embed-src="My Note"') && html.includes('embed-note')
@@ -103,9 +81,8 @@ testGroup('Embed Plugin', () => {
   test('embed with block ref ![[note#^blockid]]', md, '![[Doc#^abc]]', html =>
     html.includes('data-embed-block="abc"')
   )
-  test('embed requires wikilinks', mdNoWikilinks, '![[My Note]]', html =>
-    // Without wikilinks processing, ![[note]] stays as plain text
-    !html.includes('data-embed-src')
+  test('embeds are standalone (no wikilink dependency)', md, '![[My Note]]', html =>
+    html.includes('data-embed-src="My Note"') && html.includes('embed-note')
   )
 })
 
@@ -167,28 +144,28 @@ testGroup('Block Reference Plugin', () => {
 })
 
 testGroup('Combined / Integration', () => {
-  test('wikilink inside callout content', md, '> [!note] See [[other]]\n> Content', html =>
-    html.includes('data-callout="note"') && html.includes('class="wikilink"')
+  test('bracketed links inside callout content', md, '> [!note] See [[other]]\n> Content', html =>
+    html.includes('data-callout="note"') && html.includes('[[other]]')
   )
   test('tag inside callout content', md, '> [!tip] Use #best-practice', html =>
     html.includes('data-callout="tip"') && html.includes('obsidian-tag')
   )
-  test('comment stripped before wikilink processing', md, 'See %%secret%% [[note]]', html =>
-    !html.includes('secret') && html.includes('class="wikilink"')
+  test('comment stripped, bracketed text preserved', md, 'See %%secret%% [[note]]', html =>
+    !html.includes('secret') && html.includes('[[note]]')
   )
-  test('multiple features in same paragraph', md, 'Check [[Link]] and #tag with %%hidden%% text', html =>
-    html.includes('class="wikilink"') && html.includes('obsidian-tag') && !html.includes('hidden')
+  test('multiple features in same paragraph', md, 'Check #tag with %%hidden%% and ![[embed]] text', html =>
+    html.includes('obsidian-tag') && !html.includes('hidden') && html.includes('embed-')
   )
   test('embed after regular text', md, 'See also: ![[other-note]]', html =>
     html.includes('data-embed-src="other-note"')
   )
-  test('multiple wikilinks in same line', md, '[[A]] and [[B]]', html =>
-    (html.match(/class="wikilink"/g) || []).length === 2
+  test('multiple tags in same line', md, '#tag1 and #tag2', html =>
+    (html.match(/class="obsidian-tag"/g) || []).length === 2
   )
   test('all features disabled', createMd({
-    features: { comments: false, wikilinks: false, embeds: false, tags: false, callouts: false, blockRefs: false }
-  }), '%%hidden%% [[link]] ![[embed]] #tag ^blockid\n', html =>
-    html.includes('%%hidden%%') && html.includes('[[link]]') && html.includes('#tag')
+    features: { comments: false, embeds: false, tags: false, callouts: false, blockRefs: false }
+  }), '%%hidden%% ![[embed]] #tag ^blockid\n', html =>
+    html.includes('%%hidden%%') && html.includes('#tag')
   )
 })
 
@@ -197,8 +174,8 @@ testGroup('Combined / Integration', () => {
 testGroup('Performance', () => {
   const mdPerf = createMd()
   const longDoc = Array(100).fill(
-    'This is a paragraph with [[a link]] and #tag and %%comment%% text.\n\n' +
-    '> [!note] A callout with [[wikilink]]\n> Content here\n\n' +
+    'This is a paragraph with #tag and %%comment%% text.\n\n' +
+    '> [!note] A callout with content\n> Content here\n\n' +
     'A paragraph with ^block-id\n\n'
   ).join('')
 

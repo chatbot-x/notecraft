@@ -367,26 +367,6 @@
   text-decoration-thickness: 2px;
 }
 
-.markdown-preview a.wikilink {
-  color: oklch(0.5 0.15 280);
-  text-decoration-style: dashed;
-  cursor: pointer;
-}
-
-.dark .markdown-preview a.wikilink {
-  color: oklch(0.7 0.15 280);
-}
-
-.markdown-preview a.wikilink::before {
-  content: "[[";
-  opacity: 0.5;
-}
-
-.markdown-preview a.wikilink::after {
-  content: "]]";
-  opacity: 0.5;
-}
-
 /* ─── Images ────────────────────────────────────────────────────────────── */
 
 .markdown-preview img {

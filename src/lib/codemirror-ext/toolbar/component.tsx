@@ -57,7 +57,7 @@ const imageUploadCommand = createImageUploadCommand({
   enablePaste: true,
 })
 
-// ─── Callout Type Definitions (synced with callout-plugin.ts) ────────────────
+// ─── Callout Type Definitions (synced with callout-types.ts) ────────────────
 
 const CALLOUT_TYPES = [
   { type: 'note',      icon: '\u270E',       label: 'Note',      color: 'text-blue-500' },

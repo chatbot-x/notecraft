@@ -328,10 +328,6 @@ export function NoteApp() {
                     content={activeNote.content}
                     isDark={isDark}
                     fontSize={fontSize}
-                    onWikilinkClick={(pageName) => {
-                      // TODO: Navigate to note with matching title
-                      console.log('[Wikilink] Navigate to:', pageName)
-                    }}
                     onTaskToggle={(lineNumber, checked) => {
                       // Toggle the checkbox in the editor source
                       const lines = activeNote.content.split('\n')

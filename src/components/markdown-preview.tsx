@@ -10,8 +10,6 @@ interface MarkdownPreviewProps {
   content: string
   isDark: boolean
   fontSize: number
-  /** Callback when a wikilink is clicked in the preview */
-  onWikilinkClick?: (pageName: string) => void
   /** Callback when a task list checkbox is toggled */
   onTaskToggle?: (lineNumber: number, checked: boolean) => void
   /** Callback when a heading is clicked (for scroll sync) */
@@ -28,7 +26,6 @@ export function MarkdownPreview({
   content,
   isDark,
   fontSize,
-  onWikilinkClick,
   onTaskToggle,
   onHeadingClick,
   onTagClick,
@@ -248,19 +245,6 @@ export function MarkdownPreview({
         return
       }
 
-      // ── Wikilink click ───────────────────────────────────────────
-      const wikilink = target.closest('a.wikilink') as HTMLAnchorElement | null
-      if (wikilink) {
-        e.preventDefault()
-        const href = wikilink.getAttribute('href')
-        if (href) {
-          // Extract page name from href (strip leading /)
-          const pageName = href.replace(/^\//, '').split('#')[0]
-          onWikilinkClick?.(pageName)
-        }
-        return
-      }
-
       // ── Heading click (for scroll sync) ──────────────────────────
       const heading = target.closest('h1, h2, h3, h4, h5, h6') as HTMLElement | null
       if (heading?.id) {
@@ -271,7 +255,7 @@ export function MarkdownPreview({
 
     container.addEventListener('click', handleClick)
     return () => container.removeEventListener('click', handleClick)
-  }, [onWikilinkClick, onTaskToggle, onHeadingClick, onTagClick, onEmbedClick])
+  }, [onTaskToggle, onHeadingClick, onTagClick, onEmbedClick])
 
   // ─── Empty State ─────────────────────────────────────────────────────
 

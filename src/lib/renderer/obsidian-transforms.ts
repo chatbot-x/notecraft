@@ -1,37 +1,26 @@
 /**
  * NoteCraft Obsidian Transforms — unified core-rule pipeline.
  *
- * Merges 6 separate core rules into a single `obsidian_transforms` core rule
- * that runs after markdown-it's `inline` phase. The pipeline has two phases:
+ * A single `obsidian_transforms` core rule that runs after markdown-it's
+ * `inline` phase. The pipeline has two phases:
  *
  *   Phase 1 — Inline transforms (single walk over inline tokens):
  *     1. Comment stripping  (%%hidden%%)
- *     2. Wikilink resolution ([[note]], [[note#heading]], [[note|alias]])
- *     3. Embed detection     (![[note]], ![[image.png|300]])
- *     4. Tag replacement     (#tag, #nested/tag)
+ *     2. Embed detection     (![[note]], ![[image.png|300]])
+ *     3. Tag replacement     (#tag, #nested/tag)
  *
  *   Phase 2 — Block transforms (reverse-order token stream mutation):
- *     5. Callout transformation (> [!note], > [!warning]+, > [!danger]-)
- *     6. Block reference handling (^block-id)
+ *     4. Callout transformation (> [!note], > [!warning]+, > [!danger]-)
+ *     5. Block reference handling (^block-id)
  *
- * Benefits over 6 separate core rules:
- *   - 3 fewer full iterations over state.tokens (4 inline walks → 1)
- *   - 1 fewer full iteration for block-level scans (2 → 1 sequential pass)
- *   - Shared state / config passed once, not reconstructed per rule
- *   - Consistent unified-inspired pattern: Parse → Transform → Render
- *   - Single registration point in the core ruler chain
+ * No ordering dependencies between inline sub-passes:
+ *   - Comments first is just nice-to-have (skip hidden text in later passes)
+ *   - Embeds are standalone — parse ![[...]] directly
+ *   - Tags don't conflict with embeds or comments
  *
  * Architecture principle:
  *   markdown-it is the engine, remark is the reference implementation.
  *   Each sub-transform is a pure function that could be independently tested.
- *
- * Original files (kept for reference):
- *   - comment-plugin.ts
- *   - wikilink-plugin.ts
- *   - embed-plugin.ts
- *   - tag-plugin.ts
- *   - callout-plugin.ts
- *   - block-ref-plugin.ts
  */
 
 import type MarkdownIt from 'markdown-it'
@@ -44,12 +33,8 @@ import { CALLOUT_TYPES, CALLOUT_ALIASES, DEFAULT_CALLOUT_ICON } from './callout-
 export interface ObsidianTransformsOptions {
   /** Strip comments entirely (true) or wrap in HTML comment (false). Default: true */
   commentStrip?: boolean
-  /** Base URL for wikilink hrefs. Default: "/" */
-  wikilinkBaseURL?: string
-  /** URI suffix appended to wikilink hrefs. Default: "" */
-  wikilinkURISuffix?: string
   /** Base URL for resolving embed hrefs. Default: "/" */
-  embedWikilinkBase?: string
+  embedBase?: string
   /** CSS class for tag anchor elements. Default: "obsidian-tag" */
   tagClass?: string
   /** CSS class for block reference indicator. Default: "block-ref-id" */
@@ -59,7 +44,6 @@ export interface ObsidianTransformsOptions {
   /** Feature flags — each can be disabled independently */
   features?: {
     comments?: boolean
-    wikilinks?: boolean
     embeds?: boolean
     tags?: boolean
     callouts?: boolean
@@ -72,8 +56,9 @@ export interface ObsidianTransformsOptions {
 // Comments
 const COMMENT_RE = /%%(.*?)%%/g
 
-// Wikilinks: [[content]] where content can contain #, ^, | but not newlines
-const WIKILINK_RE = /\[\[([^\]\n|]+?)(\|[^\]\n|]+?)?\]\]/g
+// Embeds: ![[content]] where content can contain #, ^, | but not newlines
+// Captures: group 1 = source (before |), group 2 = size/alias (after |, optional)
+const EMBED_RE = /!\[\[([^\]\n|]+?)(\|[^\]\n|]+?)?\]\]/g
 
 // Tags: valid tag starts with letter/underscore
 const TAG_NAME_RE = /^[a-zA-Z_][\w/-]*$/
@@ -104,13 +89,6 @@ const SIZE_RE = /^(\d+)(?:x(\d+))?$/
 
 // ─── Parsed Types ────────────────────────────────────────────────────────────
 
-interface ParsedWikilink {
-  pageName: string
-  heading?: string
-  blockId?: string
-  alias?: string
-}
-
 interface ParsedEmbed {
   source: string
   heading?: string
@@ -132,50 +110,22 @@ interface ParsedCallout {
 
 // ─── Helper Functions ────────────────────────────────────────────────────────
 
-function parseWikilinkTarget(target: string, aliasRaw?: string): ParsedWikilink {
-  let pageName = target.trim()
-  let heading: string | undefined
-  let blockId: string | undefined
-
-  const hashIdx = pageName.indexOf('#')
-  if (hashIdx !== -1) {
-    const fragment = pageName.slice(hashIdx + 1)
-    pageName = pageName.slice(0, hashIdx)
-    if (fragment.startsWith('^')) {
-      blockId = fragment.slice(1)
-    } else {
-      heading = fragment
-    }
-  }
-
-  if (!pageName && (heading || blockId)) {
-    pageName = ''
-  }
-
-  const alias = aliasRaw ? aliasRaw.slice(1).trim() : undefined
-  return { pageName, heading, blockId, alias }
-}
-
 function hasExtension(filename: string, extensions: Set<string>): boolean {
   const lower = filename.toLowerCase()
   return Array.from(extensions).some(ext => lower.endsWith(ext))
 }
 
-function parseEmbedFromHref(href: string, displayText: string, wikilinkBase: string): ParsedEmbed {
-  let path = href
-  if (path.startsWith(wikilinkBase)) {
-    path = path.slice(wikilinkBase.length)
-  }
-  try { path = decodeURIComponent(path) } catch { /* keep as-is */ }
-
-  let source = path
+/** Parse an embed source string into components */
+function parseEmbedSource(source: string, aliasRaw?: string): ParsedEmbed {
+  let path = source.trim()
   let heading: string | undefined
   let blockId: string | undefined
 
+  // Split on # to separate path from fragment
   const hashIdx = path.indexOf('#')
   if (hashIdx !== -1) {
-    source = path.slice(0, hashIdx)
     const fragment = path.slice(hashIdx + 1)
+    path = path.slice(0, hashIdx)
     if (fragment.startsWith('^')) {
       blockId = fragment.slice(1)
     } else {
@@ -183,12 +133,15 @@ function parseEmbedFromHref(href: string, displayText: string, wikilinkBase: str
     }
   }
 
-  const isImage = hasExtension(source, IMAGE_EXTENSIONS)
-  const isMedia = hasExtension(source, MEDIA_EXTENSIONS)
+  const isImage = hasExtension(path, IMAGE_EXTENSIONS)
+  const isMedia = hasExtension(path, MEDIA_EXTENSIONS)
 
+  // Parse size from alias (for images/media)
   let width: number | undefined
   let height: number | undefined
   let aliasText: string | undefined
+
+  const displayText = aliasRaw ? aliasRaw.slice(1).trim() : undefined // Remove leading |
 
   if (displayText && (isImage || isMedia)) {
     const sizeMatch = displayText.match(SIZE_RE)
@@ -202,12 +155,12 @@ function parseEmbedFromHref(href: string, displayText: string, wikilinkBase: str
     aliasText = displayText
   }
 
-  return { source, heading, blockId, isImage, isMedia, width, height, aliasText }
+  return { source: path, heading, blockId, isImage, isMedia, width, height, aliasText }
 }
 
-function generateEmbedHtml(embed: ParsedEmbed, wikilinkBase: string): string {
+function generateEmbedHtml(embed: ParsedEmbed, embedBase: string): string {
   if (embed.isImage) {
-    const src = wikilinkBase + encodeURIComponent(embed.source)
+    const src = embedBase + encodeURIComponent(embed.source)
     let imgAttrs = `src="${src}" alt="${embed.source}" class="embed-image"`
     if (embed.width) imgAttrs += ` width="${embed.width}"`
     if (embed.height) imgAttrs += ` height="${embed.height}"`
@@ -215,7 +168,7 @@ function generateEmbedHtml(embed: ParsedEmbed, wikilinkBase: string): string {
   }
 
   if (embed.isMedia) {
-    const src = wikilinkBase + encodeURIComponent(embed.source)
+    const src = embedBase + encodeURIComponent(embed.source)
     const isAudio = embed.source.toLowerCase().match(/\.(mp3|wav|m4a|flac|ogg)$/)
     if (isAudio) {
       return `<audio controls class="embed-audio" src="${src}">Your browser does not support audio.</audio>`
@@ -319,14 +272,13 @@ function rebuildInlineContent(token: Token): void {
 
 // ─── Phase 1: Inline Transform Sub-passes ───────────────────────────────────
 // Each sub-pass operates on a single inline token's children.
-// They are called in order within the single inline walk.
+// No ordering dependencies between sub-passes.
 
 /** Sub-pass 1: Strip %%comment%% from text children */
 function applyCommentTransform(inlineToken: Token, state: StateCore, strip: boolean): void {
   const children = inlineToken.children
   if (!children) return
 
-  // Quick check: any text children contain %%?
   if (!children.some(c => c.type === 'text' && c.content.includes('%%'))) return
 
   const newChildren: Token[] = []
@@ -348,20 +300,17 @@ function applyCommentTransform(inlineToken: Token, state: StateCore, strip: bool
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i]
       if (i % 2 === 0) {
-        // Regular text (outside %%)
         if (part) {
           const textToken = new state.Token('text', '', 0)
           textToken.content = part
           newChildren.push(textToken)
         }
       } else {
-        // Comment text (inside %%)
         if (!strip) {
           const commentToken = new state.Token('html_inline', '', 0)
           commentToken.content = `<!-- ${part} -->`
           newChildren.push(commentToken)
         }
-        // If strip=true, skip entirely
       }
     }
   }
@@ -372,29 +321,27 @@ function applyCommentTransform(inlineToken: Token, state: StateCore, strip: bool
   }
 }
 
-/** Sub-pass 2: Replace [[wikilink]] patterns with link tokens */
-function applyWikilinkTransform(
+/** Sub-pass 2: Replace ![[embed]] patterns with embed HTML — standalone parsing */
+function applyEmbedTransform(
   inlineToken: Token,
   state: StateCore,
-  baseURL: string,
-  uriSuffix: string,
+  embedBase: string,
 ): void {
   const children = inlineToken.children
   if (!children) return
 
-  // Quick check: any text children contain [[?
-  if (!children.some(c => c.type === 'text' && c.content.includes('[['))) return
+  if (!children.some(c => c.type === 'text' && c.content.includes('![['))) return
 
   const newChildren: Token[] = []
   let modified = false
 
   for (const child of children) {
-    if (child.type !== 'text' || !child.content.includes('[[')) {
+    if (child.type !== 'text' || !child.content.includes('![[')) {
       newChildren.push(child)
       continue
     }
 
-    const parts = child.content.split(WIKILINK_RE)
+    const parts = child.content.split(EMBED_RE)
     if (parts.length <= 1) {
       newChildren.push(child)
       continue
@@ -406,66 +353,25 @@ function applyWikilinkTransform(
       const part = parts[i]
 
       if (i % 3 === 0) {
-        // Regular text between wikilinks
+        // Regular text between embeds
         if (part) {
           const textToken = new state.Token('text', '', 0)
           textToken.content = part
           newChildren.push(textToken)
         }
       } else if (i % 3 === 1) {
-        // Target part of wikilink
-        const target = part
+        // Source part of embed
+        const source = part
         const aliasRaw = parts[i + 1] || undefined
-        const parsed = parseWikilinkTarget(target, aliasRaw)
+        const embed = parseEmbedSource(source, aliasRaw)
+        const html = generateEmbedHtml(embed, embedBase)
 
-        // Build the href
-        let href: string
-        if (parsed.pageName) {
-          href = baseURL + encodeURIComponent(parsed.pageName) + uriSuffix
-        } else {
-          href = baseURL + uriSuffix
-        }
-
-        if (parsed.blockId) {
-          href += '#^' + encodeURIComponent(parsed.blockId)
-        } else if (parsed.heading) {
-          href += '#' + encodeURIComponent(parsed.heading)
-        }
-
-        // Determine display text
-        let displayText: string
-        if (parsed.alias) {
-          displayText = parsed.alias
-        } else if (parsed.heading) {
-          displayText = parsed.pageName
-            ? `${parsed.pageName} > ${parsed.heading}`
-            : parsed.heading
-        } else if (parsed.blockId) {
-          displayText = parsed.pageName
-            ? `${parsed.pageName} > ^${parsed.blockId}`
-            : `^${parsed.blockId}`
-        } else {
-          displayText = parsed.pageName
-        }
-
-        // Create link tokens
-        const linkOpen = new state.Token('link_open', 'a', 1)
-        linkOpen.attrPush(['href', href])
-        linkOpen.attrPush(['class', 'wikilink'])
-        if (parsed.heading) linkOpen.attrPush(['data-wikilink-heading', parsed.heading])
-        if (parsed.blockId) linkOpen.attrPush(['data-wikilink-block', parsed.blockId])
-
-        newChildren.push(linkOpen)
-
-        const textToken = new state.Token('text', '', 0)
-        textToken.content = displayText
-        newChildren.push(textToken)
-
-        const linkClose = new state.Token('link_close', 'a', -1)
-        newChildren.push(linkClose)
+        const htmlToken = new state.Token('html_inline', '', 0)
+        htmlToken.content = html
+        newChildren.push(htmlToken)
 
         // Skip the alias part (i+1) since we already processed it
-        i++ // Will be incremented again in the loop
+        i++
       }
       // i % 3 === 2 is the alias capture group, handled with i%3===1
     }
@@ -477,100 +383,7 @@ function applyWikilinkTransform(
   }
 }
 
-/** Sub-pass 3: Detect ![[embed]] pattern (text ending with ! + wikilink tokens) */
-function applyEmbedTransform(
-  inlineToken: Token,
-  state: StateCore,
-  wikilinkBase: string,
-): void {
-  const children = inlineToken.children
-  if (!children) return
-
-  // Quick check: any link tokens with wikilink class?
-  let hasWikilink = false
-  for (const child of children) {
-    if (child.type === 'link_open') {
-      const href = child.attrGet('href')
-      if (href && href.startsWith(wikilinkBase)) {
-        hasWikilink = true
-        break
-      }
-    }
-  }
-  if (!hasWikilink) return
-
-  // Scan children for pattern: text ending with "!" -> link_open (wikilink) -> ... -> link_close
-  // Process in reverse so index shifts don't affect earlier items
-  let j = children.length - 1
-  while (j >= 1) {
-    if (children[j].type !== 'link_close') {
-      j--
-      continue
-    }
-
-    // Walk backwards to find matching link_open
-    let depth = 0
-    let linkOpenIdx = -1
-    for (let k = j; k >= 0; k--) {
-      if (children[k].type === 'link_close') depth++
-      if (children[k].type === 'link_open') {
-        depth--
-        if (depth === 0) { linkOpenIdx = k; break }
-      }
-    }
-
-    if (linkOpenIdx === -1 || linkOpenIdx === 0) {
-      j--
-      continue
-    }
-
-    // Check preceding token is text ending with '!'
-    const prevToken = children[linkOpenIdx - 1]
-    if (prevToken.type !== 'text' || !prevToken.content.endsWith('!')) {
-      j = linkOpenIdx - 1
-      continue
-    }
-
-    // Check link is a wikilink
-    const href = children[linkOpenIdx].attrGet('href')
-    if (!href || !href.startsWith(wikilinkBase)) {
-      j = linkOpenIdx - 1
-      continue
-    }
-
-    // Get display text from tokens between link_open and link_close
-    let displayText = ''
-    for (let k = linkOpenIdx + 1; k < j; k++) {
-      if (children[k].type === 'text') {
-        displayText += children[k].content
-      }
-    }
-
-    const embed = parseEmbedFromHref(href, displayText, wikilinkBase)
-    const html = generateEmbedHtml(embed, wikilinkBase)
-
-    // Strip '!' from preceding text
-    prevToken.content = prevToken.content.slice(0, -1)
-
-    // Replace link_open through link_close with html_inline
-    const htmlToken = new state.Token('html_inline', '', 0)
-    htmlToken.content = html
-    children.splice(linkOpenIdx, j - linkOpenIdx + 1, htmlToken)
-
-    // Remove empty preceding text token
-    if (prevToken.content === '') {
-      const idx = children.indexOf(prevToken)
-      if (idx !== -1) {
-        children.splice(idx, 1)
-      }
-    }
-
-    rebuildInlineContent(inlineToken)
-    j = linkOpenIdx - 1
-  }
-}
-
-/** Sub-pass 4: Replace #tag patterns with tag anchor tokens */
+/** Sub-pass 3: Replace #tag patterns with tag anchor tokens */
 function applyTagTransform(
   inlineToken: Token,
   state: StateCore,
@@ -579,7 +392,6 @@ function applyTagTransform(
   const children = inlineToken.children
   if (!children) return
 
-  // Quick check: any text children contain #?
   if (!children.some(c => c.type === 'text' && c.content.includes('#'))) return
 
   const newChildren: Token[] = []
@@ -638,7 +450,6 @@ function applyCalloutTransform(state: StateCore): void {
     parsed: ParsedCallout
   }> = []
 
-  // Scan for blockquote_open tokens that start with [!TYPE]
   for (let i = 0; i < tokens.length; i++) {
     if (tokens[i].type !== 'blockquote_open') continue
 
@@ -666,13 +477,11 @@ function applyCalloutTransform(state: StateCore): void {
     toTransform.push({ openIdx: i, closeIdx, parsed })
   }
 
-  // Process in reverse order so earlier indices remain valid
   for (let r = toTransform.length - 1; r >= 0; r--) {
     const { openIdx, closeIdx, parsed } = toTransform[r]
     const meta = CALLOUT_TYPES[parsed.resolvedType] ?? { icon: DEFAULT_CALLOUT_ICON }
     const displayType = parsed.resolvedType
 
-    // Transform the blockquote wrapper into a callout
     if (parsed.isFoldable) {
       tokens[openIdx].type = 'callout_open'
       tokens[openIdx].tag = 'details'
@@ -693,7 +502,6 @@ function applyCalloutTransform(state: StateCore): void {
     tokens[closeIdx].type = 'callout_close'
     tokens[closeIdx].tag = parsed.isFoldable ? 'details' : 'div'
 
-    // Find the first paragraph and inline inside the blockquote
     let paraOpenIdx = -1
     let paraCloseIdx = -1
     let inlineIdx = -1
@@ -704,7 +512,6 @@ function applyCalloutTransform(state: StateCore): void {
     }
     if (inlineIdx === -1) continue
 
-    // Strip the [!TYPE][+/-] Title marker from the first inline
     const inlineToken = tokens[inlineIdx]
     const fullMatch = inlineToken.content.match(CALLOUT_RE)
     if (!fullMatch) continue
@@ -719,7 +526,6 @@ function applyCalloutTransform(state: StateCore): void {
     }
     inlineToken.content = inlineToken.content.slice(markerText.length)
 
-    // Clean up leading empty text nodes and softbreaks
     if (inlineToken.children) {
       while (inlineToken.children.length > 0) {
         const first = inlineToken.children[0]
@@ -739,7 +545,6 @@ function applyCalloutTransform(state: StateCore): void {
       tokens.splice(paraOpenIdx, paraCloseIdx - paraOpenIdx + 1)
     }
 
-    // Insert title tokens and content wrapper
     const titleTokens: Token[] = []
 
     const titleDivOpen = new state.Token('callout_title_open', parsed.isFoldable ? 'summary' : 'div', 1)
@@ -782,10 +587,8 @@ function applyCalloutTransform(state: StateCore): void {
     contentDivOpen.attrPush(['class', 'callout-content'])
     titleTokens.push(contentDivOpen)
 
-    // Insert title + content_open tokens right after callout_open
     tokens.splice(openIdx + 1, 0, ...titleTokens)
 
-    // Insert content_div_close right before callout_close
     const removeCount = !hasContent && paraOpenIdx !== -1 ? (paraCloseIdx - paraOpenIdx + 1) : 0
     const shiftedCloseIdx = closeIdx + titleTokens.length - removeCount
     const contentDivClose = new state.Token('callout_content_close', 'div', -1)
@@ -828,7 +631,6 @@ function applyBlockRefTransform(
     const isStandalone = STANDALONE_BLOCK_ID_RE.test(content.trim())
 
     if (isStandalone) {
-      // Remove standalone block-id paragraph, attach to preceding block
       tokens.splice(i, closeIdx - i + 1)
 
       for (let k = i - 1; k >= 0; k--) {
@@ -866,7 +668,6 @@ function applyBlockRefTransform(
       continue
     }
 
-    // Non-standalone: strip ^block-id from visible content
     const markerText = match[0]
     inlineToken.content = content.slice(0, content.length - markerText.length)
 
@@ -909,26 +710,21 @@ function obsidianTransformsRule(opts: Required<ObsidianTransformsOptions>): (sta
   const features = opts.features
 
   return function obsidianTransforms(state: StateCore): void {
-    // ── Phase 1: Inline transforms — single walk, ordered sub-passes ──
+    // ── Phase 1: Inline transforms — single walk ──
     for (const token of state.tokens) {
       if (token.type !== 'inline' || !token.children) continue
 
-      // Sub-pass 1: Strip %%comments%% (do first so hidden text is ignored by later passes)
+      // Sub-pass 1: Strip %%comments%%
       if (features.comments) {
         applyCommentTransform(token, state, opts.commentStrip)
       }
 
-      // Sub-pass 2: Replace [[wikilinks]] with link tokens
-      if (features.wikilinks) {
-        applyWikilinkTransform(token, state, opts.wikilinkBaseURL, opts.wikilinkURISuffix)
-      }
-
-      // Sub-pass 3: Detect ![[embeds]] (must be after wikilinks)
+      // Sub-pass 2: Replace ![[embeds]] (standalone, no dependency on other transforms)
       if (features.embeds) {
-        applyEmbedTransform(token, state, opts.embedWikilinkBase)
+        applyEmbedTransform(token, state, opts.embedBase)
       }
 
-      // Sub-pass 4: Replace #tags with anchor tokens
+      // Sub-pass 3: Replace #tags
       if (features.tags) {
         applyTagTransform(token, state, opts.tagClass)
       }
@@ -985,18 +781,14 @@ function registerObsidianRenderers(md: MarkdownIt): void {
 export default function obsidianTransformsPlugin(md: MarkdownIt, opts: ObsidianTransformsOptions = {}): void {
   const features = opts.features ?? {}
 
-  // Resolve all options with defaults
   const resolvedOpts: Required<ObsidianTransformsOptions> = {
     commentStrip: opts.commentStrip ?? true,
-    wikilinkBaseURL: opts.wikilinkBaseURL ?? '/',
-    wikilinkURISuffix: opts.wikilinkURISuffix ?? '',
-    embedWikilinkBase: opts.embedWikilinkBase ?? '/',
+    embedBase: opts.embedBase ?? '/',
     tagClass: opts.tagClass ?? 'obsidian-tag',
     blockRefIndicatorClass: opts.blockRefIndicatorClass ?? 'block-ref-id',
     blockRefShowIndicator: opts.blockRefShowIndicator ?? true,
     features: {
       comments: features.comments ?? true,
-      wikilinks: features.wikilinks ?? true,
       embeds: features.embeds ?? true,
       tags: features.tags ?? true,
       callouts: features.callouts ?? true,
@@ -1004,9 +796,6 @@ export default function obsidianTransformsPlugin(md: MarkdownIt, opts: ObsidianT
     },
   }
 
-  // Register the single merged core rule
   md.core.ruler.after('inline', 'obsidian_transforms', obsidianTransformsRule(resolvedOpts))
-
-  // Register all custom renderers
   registerObsidianRenderers(md)
 }
