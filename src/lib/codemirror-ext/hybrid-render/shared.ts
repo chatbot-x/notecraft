@@ -238,8 +238,12 @@ export const TAG_RE = /(?:^|[\s(>[,;:~"'])#([a-zA-Z_][\w/-]*)/g
 /** Match Obsidian callout header: > [!type] or > [!type]+ or > [!type]- */
 export const CALLOUT_HEADER_RE = /^(\s*>\s*)\[!(\w+)\]([+-]?)(?:[ \t]+(.*))?$/gm
 
-/** Match Obsidian comments: %%comment text%% (non-greedy) */
-export const COMMENT_RE = /%%([\s\S]*?)%%/g
+/** Match Obsidian comments: %%comment text%% (non-greedy, single-line only).
+ *  Uses [^\n] instead of [\s\S] to prevent cross-line matches, because
+ *  Decoration.replace() in a ViewPlugin cannot span line breaks.
+ *  Multi-line comments are handled by the Lezer tree path instead.
+ */
+export const COMMENT_RE = /%%([^\n]*?)%%/g
 
 /** Match Obsidian block references: ^block-id at end of paragraph/line */
 export const BLOCK_REF_RE = /(?:^|\s)\^([a-zA-Z0-9_-]+)\s*$/gm

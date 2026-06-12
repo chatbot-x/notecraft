@@ -351,11 +351,13 @@ function applyTableDecorations(
       // Parse alignments from separator line (key enhancement)
       alignments = parseAlignments(lineText)
 
+      // Use block: true + line.to (without +1) to avoid crossing line breaks.
+      // CM6 forbids non-block Decoration.replace() that spans line breaks in ViewPlugins.
       ranges.push(
         Decoration.replace({
           widget: getTableBadge(colCount || 1, 0),
-          block: false,
-        }).range(line.from, line.to + 1)
+          block: true,
+        }).range(line.from, line.to)
       )
       pos = line.to + 1
       continue
@@ -474,11 +476,13 @@ function applyTableDecorationsWithInfo(
 
     // ── Separator line: hide entirely ────────────────────────────────
     if (TABLE_SEPARATOR_RE.test(lineText)) {
+      // Use block: true + line.to (without +1) to avoid crossing line breaks.
+      // CM6 forbids non-block Decoration.replace() that spans line breaks in ViewPlugins.
       ranges.push(
         Decoration.replace({
           widget: getTableBadge(table.colCount, table.rowCount - 1),
-          block: false,
-        }).range(line.from, line.to + 1)
+          block: true,
+        }).range(line.from, line.to)
       )
       pos = line.to + 1
       continue
