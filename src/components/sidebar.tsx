@@ -37,22 +37,27 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useMemo } from 'react'
 
 export function Sidebar() {
-  const {
-    notes,
-    activeNoteId,
-    searchQuery,
-    sidebarOpen,
-    setActiveNoteId,
-    setSearchQuery,
-    setSidebarOpen,
-    createNote,
-    deleteNote,
-    duplicateNote,
-    getFilteredNotes,
-    setCommandPaletteOpen,
-  } = useNotesStore()
+  const notes = useNotesStore((s) => s.notes)
+  const activeNoteId = useNotesStore((s) => s.activeNoteId)
+  const searchQuery = useNotesStore((s) => s.searchQuery)
+  const sidebarOpen = useNotesStore((s) => s.sidebarOpen)
+  const setActiveNoteId = useNotesStore((s) => s.setActiveNoteId)
+  const setSearchQuery = useNotesStore((s) => s.setSearchQuery)
+  const setSidebarOpen = useNotesStore((s) => s.setSidebarOpen)
+  const createNote = useNotesStore((s) => s.createNote)
+  const deleteNote = useNotesStore((s) => s.deleteNote)
+  const duplicateNote = useNotesStore((s) => s.duplicateNote)
+  const setCommandPaletteOpen = useNotesStore((s) => s.setCommandPaletteOpen)
 
-  const filteredNotes = useMemo(() => getFilteredNotes(), [notes, searchQuery])
+  const filteredNotes = useMemo(() => {
+    if (!searchQuery.trim()) return notes
+    const q = searchQuery.toLowerCase()
+    return notes.filter(
+      (note) =>
+        note.title.toLowerCase().includes(q) ||
+        note.content.toLowerCase().includes(q)
+    )
+  }, [notes, searchQuery])
 
   const handleCreateNote = () => {
     createNote()
@@ -284,7 +289,7 @@ export function Sidebar() {
                           <>
                             <span className="text-[11px] text-muted-foreground">·</span>
                             <span className="text-[11px] text-muted-foreground line-clamp-1 flex-1">
-                              {note.content.split('\n').slice(1).find((l) => l.trim()) || note.content.split('\n')[0]}
+                              {(() => { const lines = note.content.split('\n'); return lines.slice(1).find((l) => l.trim()) || lines[0] })()}
                             </span>
                           </>
                         )}

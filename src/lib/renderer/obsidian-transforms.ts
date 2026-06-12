@@ -115,7 +115,10 @@ interface ParsedCallout {
 
 function hasExtension(filename: string, extensions: Set<string>): boolean {
   const lower = filename.toLowerCase()
-  return Array.from(extensions).some(ext => lower.endsWith(ext))
+  for (const ext of extensions) {
+    if (lower.endsWith(ext)) return true
+  }
+  return false
 }
 
 /** Parse an embed source string into components */
@@ -161,10 +164,18 @@ function parseEmbedSource(source: string, aliasRaw?: string): ParsedEmbed {
   return { source: path, heading, blockId, isImage, isMedia, width, height, aliasText }
 }
 
+function escapeAttr(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function generateEmbedHtml(embed: ParsedEmbed, embedBase: string): string {
   if (embed.isImage) {
     const src = embedBase + encodeURIComponent(embed.source)
-    let imgAttrs = `src="${src}" alt="${embed.source}" class="embed-image"`
+    let imgAttrs = `src="${src}" alt="${escapeAttr(embed.source)}" class="embed-image"`
     if (embed.width) imgAttrs += ` width="${embed.width}"`
     if (embed.height) imgAttrs += ` height="${embed.height}"`
     return `<img ${imgAttrs} loading="lazy" />`
@@ -181,11 +192,11 @@ function generateEmbedHtml(embed: ParsedEmbed, embedBase: string): string {
 
   // Note embed
   const dataAttrs: string[] = [
-    `data-embed-src="${embed.source}"`,
+    `data-embed-src="${escapeAttr(embed.source)}"`,
     `data-embed-type="note"`,
   ]
-  if (embed.heading) dataAttrs.push(`data-embed-heading="${embed.heading}"`)
-  if (embed.blockId) dataAttrs.push(`data-embed-block="${embed.blockId}"`)
+  if (embed.heading) dataAttrs.push(`data-embed-heading="${escapeAttr(embed.heading)}"`)
+  if (embed.blockId) dataAttrs.push(`data-embed-block="${escapeAttr(embed.blockId)}"`)
 
   const displayText = embed.aliasText || embed.source
 
@@ -193,7 +204,7 @@ function generateEmbedHtml(embed: ParsedEmbed, embedBase: string): string {
     `<div class="embed-note" ${dataAttrs.join(' ')}>` +
     `<div class="embed-note-header">` +
     `<span class="embed-note-icon">\u{1F517}</span>` +
-    `<span class="embed-note-title">${displayText}</span>` +
+    `<span class="embed-note-title">${escapeHtml(displayText)}</span>` +
     `</div>` +
     `<div class="embed-note-content" data-embed-placeholder="true">` +
     `<em>Loading embed...</em>` +

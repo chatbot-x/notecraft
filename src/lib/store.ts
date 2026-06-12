@@ -1,7 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export type ViewMode = 'edit' | 'preview' | 'split'
 
@@ -297,6 +297,7 @@ export const useNotesStore = create<NotesState>()(
     }),
     {
       name: 'notecraft-storage',
+      version: 1,
       partialize: (state) => ({
         notes: state.notes,
         activeNoteId: state.activeNoteId,
@@ -305,9 +306,25 @@ export const useNotesStore = create<NotesState>()(
         fontSize: state.fontSize,
         isDark: state.isDark,
       }),
+      storage: createJSONStorage(() => ({
+        getItem: localStorage.getItem.bind(localStorage),
+        setItem: (key: string, value: string) => {
+          try {
+            localStorage.setItem(key, value)
+          } catch (e) {
+            // QuotaExceededError — warn but don't crash the app
+            console.warn('[NoteCraft] localStorage quota exceeded — changes may not persist.', e)
+          }
+        },
+        removeItem: localStorage.removeItem.bind(localStorage),
+      })),
       onRehydrateStorage: () => (state) => {
+        // Always mark as hydrated so the app isn't stuck on the loading screen
         if (state) {
           state.setHasHydrated(true)
+        } else {
+          // Rehydration failed (corrupted/empty localStorage) — still show the UI
+          useNotesStore.setState({ hasHydrated: true })
         }
       },
     }

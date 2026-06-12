@@ -167,6 +167,8 @@ const uploadDecorator = ViewPlugin.fromClass(class implements PluginValue {
 // ─── Auto-replace successful uploads ───────────────────────────────────────────
 
 const uploadReplacer = ViewPlugin.fromClass(class implements PluginValue {
+  private destroyed = false
+
   constructor(readonly view: EditorView) {}
 
   update(update: ViewUpdate) {
@@ -184,17 +186,25 @@ const uploadReplacer = ViewPlugin.fromClass(class implements PluginValue {
 
     // Defer dispatch to avoid dispatching during update cycle
     setTimeout(() => {
+      if (this.destroyed) return
+      // Batch all replacements into a single dispatch to avoid stale doc state
+      const doc = this.view.state.doc.toString()
+      const changes: Array<{ from: number; to: number; insert: string }> = []
       for (const { id, url } of replacements) {
         const searchText = `${UPLOAD_PREFIX}${id}`
-        const doc = this.view.state.doc.toString()
         const pos = doc.indexOf(searchText)
         if (pos !== -1) {
-          this.view.dispatch({
-            changes: { from: pos, to: pos + searchText.length, insert: url },
-          })
+          changes.push({ from: pos, to: pos + searchText.length, insert: url })
         }
       }
+      if (changes.length > 0) {
+        this.view.dispatch({ changes })
+      }
     }, 0)
+  }
+
+  destroy() {
+    this.destroyed = true
   }
 }, {})
 

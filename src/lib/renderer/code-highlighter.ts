@@ -29,6 +29,10 @@ async function getHighlighter(isDark: boolean): Promise<Highlighter> {
         'perl', 'r', 'scala', 'haskell', 'elixir', 'clojure',
         'dockerfile', 'make', 'nginx', 'diff',
       ],
+    }).catch(err => {
+      // Reset so a retry can succeed — don't cache a rejected promise
+      highlighterPromise = null
+      throw err
     })
   }
   return highlighterPromise
@@ -91,8 +95,8 @@ export async function highlightAllCodeBlocks(
   html: string,
   isDark: boolean
 ): Promise<string> {
-  // Match <code class="language-xxx"> or <code class="xxx"> inside <pre>
-  const codeBlockRegex = /<pre><code class="language-(\w+)">([\s\S]*?)<\/code><\/pre>/g
+  // Match <code class="language-xxx"> or <code class="language-xxx ..."> inside <pre>
+  const codeBlockRegex = /<pre><code[^>]*class="[^"]*language-(\w+)[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/g
   const simpleCodeRegex = /<pre><code>([\s\S]*?)<\/code><\/pre>/g
 
   const replacements: Array<{ match: string; replacement: Promise<string> }> = []
@@ -111,7 +115,7 @@ export async function highlightAllCodeBlocks(
 
   // Process plain code blocks (no language specified)
   while ((match = simpleCodeRegex.exec(html)) !== null) {
-    const rawCode = decodeHtmlEntities(match[2])
+    const rawCode = decodeHtmlEntities(match[1])  // simpleCodeRegex has only 1 capture group
     const fullMatch = match[0]
     replacements.push({
       match: fullMatch,
@@ -122,10 +126,17 @@ export async function highlightAllCodeBlocks(
   // Resolve all replacements in parallel
   const resolved = await Promise.all(replacements.map((r) => r.replacement))
 
-  // Apply replacements
+  // Apply replacements using unique placeholders to avoid collision
+  // when two code blocks have identical content
   let result = html
+  const placeholders: string[] = []
   for (let i = 0; i < replacements.length; i++) {
-    result = result.replace(replacements[i].match, resolved[i])
+    const placeholder = `__CODE_BLOCK_${i}_PLACEHOLDER__`
+    placeholders.push(placeholder)
+    result = result.replace(replacements[i].match, placeholder)
+  }
+  for (let i = 0; i < replacements.length; i++) {
+    result = result.replace(placeholders[i], resolved[i])
   }
 
   return result
@@ -195,9 +206,8 @@ function wrapCodeBlock(
 }
 
 function addLineNumbers(html: string): string {
-  // Shiki wraps code in <pre><code>. We add a line-number gutter.
-  const lines = html.split('\n')
-  const lineCount = lines.filter((l) => l.trim()).length
+  // Shiki wraps each line in <span class="line"> — count those for accurate numbering
+  const lineCount = html.split('<span class="line').length - 1 || html.split('\n').length
 
   // Build line number column
   const lineNums = Array.from({ length: lineCount }, (_, i) =>

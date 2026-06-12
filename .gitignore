@@ -77,3 +77,4 @@ Caddyfile
 # OpenNext build output
 .open-next/
 .wrangler/
+tool-results/

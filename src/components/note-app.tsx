@@ -19,7 +19,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Tooltip,
@@ -171,6 +171,9 @@ export function NoteApp() {
     return () => window.removeEventListener('keydown', handler)
   }, [createNote, sidebarOpen, setSidebarOpen, setCommandPaletteOpen, viewMode, setViewMode, fontSize, setFontSize])
 
+  // Memoize notes for preview to avoid unnecessary re-renders
+  const notesForPreview = useMemo(() => notes.map(n => ({ title: n.title, content: n.content })), [notes])
+
   const handleCreateNote = () => {
     createNote()
   }
@@ -206,6 +209,11 @@ export function NoteApp() {
   useEffect(() => {
     if (viewMode !== 'split') return
 
+    // Reset sync direction tracking to avoid stale state from previous mode
+    syncScrollRef.current = null
+
+    // The preview scroll container is set by MarkdownPreview's ref callback.
+    // Find the actual scrollable element inside the preview div.
     const editorEl = editorScrollRef.current
     const previewEl = previewScrollRef.current
     if (!editorEl || !previewEl) return
@@ -444,7 +452,7 @@ export function NoteApp() {
               </div>
 
               {/* Preview */}
-              <div ref={previewScrollRef} className={cn(
+              <div className={cn(
                 'h-full overflow-hidden',
                 viewMode === 'preview' ? 'w-full relative' : viewMode === 'split' ? 'w-1/2 relative' : 'absolute invisible pointer-events-none w-full'
               )}>
@@ -452,13 +460,17 @@ export function NoteApp() {
                     content={activeNote.content}
                     isDark={isDark}
                     fontSize={fontSize}
-                    notes={notes.map(n => ({ title: n.title, content: n.content }))}
+                    notes={notesForPreview}
                     scrollContainerRef={previewScrollRef}
                     onTaskToggle={(lineNumber, checked) => {
                       // Toggle the checkbox in the editor source
                       const lines = activeNote.content.split('\n')
                       if (lineNumber >= 0 && lineNumber < lines.length) {
                         const line = lines[lineNumber]
+                        // Guard: verify the line still contains a checkbox pattern
+                        // (content may have changed since the preview was rendered)
+                        if (checked && !line.includes('[ ]') && !line.includes('[x]')) return
+                        if (!checked && !line.includes('[x]') && !line.includes('[ ]')) return
                         if (checked) {
                           lines[lineNumber] = line.replace('[ ]', '[x]')
                         } else {

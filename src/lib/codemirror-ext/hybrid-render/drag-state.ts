@@ -57,23 +57,15 @@ export const dragSelectingField = StateField.define<boolean>({
 // ─── DOM Event Handlers ─────────────────────────────────────────────────────────
 
 /**
- * Extension that wires mousedown/mouseup to the drag-selecting field.
+ * Extension that wires pointerdown/pointerup to the drag-selecting field.
  *
  * Must be included in the extension set for `dragSelectingField` to work.
+ * Uses pointer events (not mouse events) because they fire for both mouse
+ * and touch, avoiding duplicate dispatches from dual mouse+pointer handlers.
  * Only tracks primary-button drags (button === 0) to avoid interfering with
  * context menus.
  */
 export const dragSelectHandlers = EditorView.domEventHandlers({
-  mousedown(event, view) {
-    if (event.button === 0) {
-      view.dispatch({ effects: startDragSelect.of(undefined) })
-    }
-  },
-  mouseup(event, view) {
-    if (event.button === 0) {
-      view.dispatch({ effects: endDragSelect.of(undefined) })
-    }
-  },
   pointerdown(event, view) {
     if (event.button === 0) {
       view.dispatch({ effects: startDragSelect.of(undefined) })

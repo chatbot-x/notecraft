@@ -52,6 +52,7 @@ import { imageDataUrlHandler } from '@/lib/image-upload'
 
 const themeCompartment = new Compartment()
 const fontSizeCompartment = new Compartment()
+const colorThemeCompartment = new Compartment()
 
 // ─── Editor Component ──────────────────────────────────────────────────────────
 
@@ -147,6 +148,42 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
       // Slug input panel (replaces browser prompt() for heading ID)
       ...slugPanelExtensions,
       themeCompartment.of(isDark ? oneDark : []),
+      colorThemeCompartment.of(EditorView.theme({
+        '.cm-content': {
+          caretColor: isDark ? '#e2e8f0' : '#1e293b',
+        },
+        '.cm-gutters': {
+          backgroundColor: 'transparent',
+          borderRight: 'none',
+          color: isDark ? '#64748b' : '#94a3b8',
+          paddingLeft: '8px',
+          paddingRight: '8px',
+        },
+        '.cm-activeLineGutter': {
+          backgroundColor: 'transparent',
+          color: isDark ? '#94a3b8' : '#64748b',
+          fontWeight: '600',
+        },
+        '&.cm-focused .cm-cursor': {
+          borderLeftColor: isDark ? '#60a5fa' : '#3b82f6',
+          borderLeftWidth: '2px',
+        },
+        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+          backgroundColor: isDark ? 'rgba(96, 165, 250, 0.25)' : 'rgba(59, 130, 246, 0.15)',
+        },
+        '.cm-activeLine': {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+        },
+        '.cm-strikethrough': {
+          textDecoration: 'line-through',
+          opacity: '0.6',
+        },
+        '.cm-inline-code': {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+          borderRadius: '3px',
+          padding: '1px 4px',
+        },
+      })),
       fontSizeCompartment.of(EditorView.theme({
         '&': { fontSize: `${fontSize}px` },
       })),
@@ -176,19 +213,6 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
         },
         '.cm-content': {
           padding: '20px 4px',
-          caretColor: isDark ? '#e2e8f0' : '#1e293b',
-        },
-        '.cm-gutters': {
-          backgroundColor: 'transparent',
-          borderRight: 'none',
-          color: isDark ? '#64748b' : '#94a3b8',
-          paddingLeft: '8px',
-          paddingRight: '8px',
-        },
-        '.cm-activeLineGutter': {
-          backgroundColor: 'transparent',
-          color: isDark ? '#94a3b8' : '#64748b',
-          fontWeight: '600',
         },
         '.cm-foldGutter': {
           opacity: '0.5',
@@ -200,18 +224,8 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
         '&.cm-focused': {
           outline: 'none',
         },
-        '&.cm-focused .cm-cursor': {
-          borderLeftColor: isDark ? '#60a5fa' : '#3b82f6',
-          borderLeftWidth: '2px',
-        },
-        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
-          backgroundColor: isDark ? 'rgba(96, 165, 250, 0.25)' : 'rgba(59, 130, 246, 0.15)',
-        },
         '.cm-line': {
           padding: '0 12px',
-        },
-        '.cm-activeLine': {
-          backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
         },
         // Markdown heading styles
         '.cm-header-1': {
@@ -237,10 +251,6 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
         '.cm-em': {
           fontStyle: 'italic',
         },
-        '.cm-strikethrough': {
-          textDecoration: 'line-through',
-          opacity: '0.6',
-        },
         '.cm-link': {
           textDecoration: 'underline',
           textUnderlineOffset: '3px',
@@ -250,12 +260,6 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
         },
         '.cm-hr': {
           opacity: '0.3',
-        },
-        // Code block styling
-        '.cm-inline-code': {
-          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-          borderRadius: '3px',
-          padding: '1px 4px',
         },
       }),
     ]
@@ -293,7 +297,45 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
     const view = viewRef.current
     if (!view) return
     view.dispatch({
-      effects: themeCompartment.reconfigure(isDark ? oneDark : []),
+      effects: [
+        themeCompartment.reconfigure(isDark ? oneDark : []),
+        colorThemeCompartment.reconfigure(EditorView.theme({
+          '.cm-content': {
+            caretColor: isDark ? '#e2e8f0' : '#1e293b',
+          },
+          '.cm-gutters': {
+            backgroundColor: 'transparent',
+            borderRight: 'none',
+            color: isDark ? '#64748b' : '#94a3b8',
+            paddingLeft: '8px',
+            paddingRight: '8px',
+          },
+          '.cm-activeLineGutter': {
+            backgroundColor: 'transparent',
+            color: isDark ? '#94a3b8' : '#64748b',
+            fontWeight: '600',
+          },
+          '&.cm-focused .cm-cursor': {
+            borderLeftColor: isDark ? '#60a5fa' : '#3b82f6',
+            borderLeftWidth: '2px',
+          },
+          '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+            backgroundColor: isDark ? 'rgba(96, 165, 250, 0.25)' : 'rgba(59, 130, 246, 0.15)',
+          },
+          '.cm-activeLine': {
+            backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+          },
+          '.cm-strikethrough': {
+            textDecoration: 'line-through',
+            opacity: '0.6',
+          },
+          '.cm-inline-code': {
+            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+            borderRadius: '3px',
+            padding: '1px 4px',
+          },
+        })),
+      ],
     })
   }, [isDark])
 

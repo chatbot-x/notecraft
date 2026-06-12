@@ -452,6 +452,7 @@ export interface FormatDocumentOptions {
 export const formatDocument: Command = (view): boolean => {
   const { state } = view
   const content = state.doc.toString()
+  const docLength = state.doc.length
   const cursorPos = state.selection.main.head
 
   // Track the line the cursor is on before formatting
@@ -465,6 +466,12 @@ export const formatDocument: Command = (view): boolean => {
     printWidth: 80,
     proseWrap: 'preserve',
   }).then((formatted) => {
+    // Abort if the document changed while Prettier was running
+    if (view.state.doc.length !== docLength) {
+      view.focus()
+      return
+    }
+
     // If nothing changed, skip
     if (formatted === content) {
       view.focus()

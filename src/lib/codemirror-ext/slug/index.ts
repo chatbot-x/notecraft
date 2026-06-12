@@ -108,10 +108,11 @@ export function scanDocumentHeadings(doc: string): Map<number, { level: number; 
       slug = generateSlug(parsed.title)
     }
 
-    // Handle duplicates
+    // Handle duplicates — first occurrence gets no suffix,
+    // second gets -1, third gets -2 (matching GitHub slugger behavior)
     const count = seenSlugs.get(slug) ?? 0
     if (count > 0) {
-      slug = `${slug}-${count + 1}`
+      slug = `${slug}-${count}`
     }
     seenSlugs.set(slug.replace(/-\d+$/, ''), (seenSlugs.get(slug.replace(/-\d+$/, '')) ?? 0) + 1)
 

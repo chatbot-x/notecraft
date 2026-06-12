@@ -244,7 +244,7 @@ function buildFrontmatterDecorations(
       Decoration.replace({
         widget: new CollapsedFrontmatterWidget(fm.keys.length, fm.keys.slice(0, 3)),
         block: true,
-      }).range(fm.from, fm.to + 1)
+      }).range(fm.from, Math.min(fm.to + 1, state.doc.length))
     )
   }
 

@@ -45,6 +45,7 @@ export function MarkdownPreview({
   const [isRendering, setIsRendering] = useState(false)
   const zoomRef = useRef<Zoom | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const renderVersionRef = useRef(0)
 
   // ─── Render Markdown ──────────────────────────────────────────────────
 
@@ -54,6 +55,9 @@ export function MarkdownPreview({
       return
     }
 
+    // Increment version counter to detect stale async renders
+    const version = ++renderVersionRef.current
+
     setIsRendering(true)
     try {
       // Use sync render first for fast initial paint
@@ -62,14 +66,19 @@ export function MarkdownPreview({
 
       // Then do async render with Shiki highlighting
       const asyncResult = await renderMarkdown(content, { isDark })
+      // Discard stale result if a newer render has started
+      if (renderVersionRef.current !== version) return
       setRenderResult(asyncResult)
     } catch (err) {
+      if (renderVersionRef.current !== version) return
       logger.error('[MarkdownPreview] Render error:', err)
       // Fallback to sync render
       const fallback = renderMarkdownSync(content, { isDark })
       setRenderResult(fallback)
     } finally {
-      setIsRendering(false)
+      if (renderVersionRef.current === version) {
+        setIsRendering(false)
+      }
     }
   }, [content, isDark])
 
@@ -90,12 +99,19 @@ export function MarkdownPreview({
     const placeholders = containerRef.current.querySelectorAll('.embed-note-content[data-embed-placeholder="true"]')
     if (placeholders.length === 0) return
 
+    // Track resolved sources to prevent recursive/circular embeds
+    const resolving = new Set<string>()
+
     for (const placeholder of placeholders) {
       const embedContainer = placeholder.closest('.embed-note') as HTMLElement | null
       if (!embedContainer) continue
 
       const source = embedContainer.dataset.embedSrc
       if (!source) continue
+
+      // Skip if already resolving this source (prevents infinite recursion)
+      if (resolving.has(source.toLowerCase())) continue
+      resolving.add(source.toLowerCase())
 
       // Find the matching note by title (case-insensitive)
       const matchedNote = notes.find(
@@ -237,6 +253,8 @@ export function MarkdownPreview({
               copyBtn.setAttribute('title', originalTitle ?? 'Copy code')
               copyBtn.classList.remove('copied')
             }, 2000)
+          }).catch(() => {
+            toast({ title: 'Copy failed', description: 'Could not copy to clipboard' })
           })
         }
         return

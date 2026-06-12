@@ -227,7 +227,7 @@ export const EMBED_TRANSCLUDE_RE = /!\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g
 export const IMAGE_RE = /!\[([^\]]*)\]\(([^)]+)\)/g
 
 /** Match $...$ (inline math, not $$) — no lookbehind for Safari compat */
-export const INLINE_MATH_RE = /(?:^|[^$])\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g
+export const INLINE_MATH_RE = /(?:^|[^$])\$(?!\$)([^$\n]+?)\$(?!\$)/g
 
 /** Match $$...$$ (display math) */
 export const DISPLAY_MATH_RE = /\$\$([^$]+?)\$\$/g

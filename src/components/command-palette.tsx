@@ -15,21 +15,17 @@ interface Command {
 }
 
 export function CommandPalette() {
-  const {
-    notes,
-    activeNoteId,
-    sidebarOpen,
-    commandPaletteOpen,
-    setCommandPaletteOpen,
-    setActiveNoteId,
-    createNote,
-    deleteNote,
-    duplicateNote,
-    setSidebarOpen,
-    setViewMode,
-  } = useNotesStore()
+  const notes = useNotesStore((s) => s.notes)
+  const commandPaletteOpen = useNotesStore((s) => s.commandPaletteOpen)
+  const setCommandPaletteOpen = useNotesStore((s) => s.setCommandPaletteOpen)
+  const setActiveNoteId = useNotesStore((s) => s.setActiveNoteId)
+  const createNote = useNotesStore((s) => s.createNote)
+  const deleteNote = useNotesStore((s) => s.deleteNote)
+  const duplicateNote = useNotesStore((s) => s.duplicateNote)
+  const setSidebarOpen = useNotesStore((s) => s.setSidebarOpen)
+  const setViewMode = useNotesStore((s) => s.setViewMode)
 
-  const [isDark, setIsDark] = useState(false)
+  const [isDark, setIsDark] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'))
 
   // Track dark mode reactively
   useEffect(() => {
@@ -74,14 +70,15 @@ export function CommandPalette() {
       },
       category: 'action',
     },
-    ...(activeNoteId
+    ...(useNotesStore.getState().activeNoteId
       ? [
           {
             id: 'duplicate-note',
             label: 'Duplicate current note',
             icon: <Copy className="h-4 w-4" />,
             action: () => {
-              if (activeNoteId) duplicateNote(activeNoteId)
+              const currentId = useNotesStore.getState().activeNoteId
+              if (currentId) duplicateNote(currentId)
               setCommandPaletteOpen(false)
             },
             category: 'action' as const,
@@ -91,7 +88,8 @@ export function CommandPalette() {
             label: 'Delete current note',
             icon: <Trash2 className="h-4 w-4" />,
             action: () => {
-              if (activeNoteId) deleteNote(activeNoteId)
+              const currentId = useNotesStore.getState().activeNoteId
+              if (currentId) deleteNote(currentId)
               setCommandPaletteOpen(false)
             },
             category: 'action' as const,
@@ -101,11 +99,12 @@ export function CommandPalette() {
     // View commands
     {
       id: 'toggle-sidebar',
-      label: sidebarOpen ? 'Close sidebar' : 'Open sidebar',
+      label: useNotesStore.getState().sidebarOpen ? 'Close sidebar' : 'Open sidebar',
       shortcut: 'Ctrl+B',
       icon: <PanelLeft className="h-4 w-4" />,
       action: () => {
-        setSidebarOpen(!sidebarOpen)
+        const current = useNotesStore.getState().sidebarOpen
+        setSidebarOpen(!current)
         setCommandPaletteOpen(false)
       },
       category: 'view',
@@ -181,6 +180,11 @@ export function CommandPalette() {
       return () => clearTimeout(timer)
     }
   }, [commandPaletteOpen])
+
+  // Clamp selectedIndex when filtered results change
+  useEffect(() => {
+    setSelectedIndex((i) => Math.min(i, Math.max(0, filtered.length - 1)))
+  }, [filtered.length])
 
   // Keyboard navigation
   useEffect(() => {
@@ -276,7 +280,6 @@ export function CommandPalette() {
                 {categories.map((cat) => {
                   const items = filtered.filter((c) => c.category === cat.key)
                   if (items.length === 0) return null
-                  let globalIndex = filtered.indexOf(items[0])
                   return (
                     <div key={cat.key}>
                       <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">

@@ -130,7 +130,7 @@ const ALLOWED_TAGS = [
   'b', 'bdi', 'bdo', 'blockquote', 'br', 'button',
   'canvas', 'caption', 'cite', 'code', 'col', 'colgroup',
   'dd', 'del', 'details', 'dfn', 'div', 'dl', 'dt',
-  'em', 'embed',
+  'em',
   'fieldset', 'figcaption', 'figure', 'footer', 'form',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr',
   'i', 'img', 'input', 'ins',
@@ -161,7 +161,7 @@ const ALLOWED_TAGS = [
 ]
 
 const ALLOWED_ATTR = [
-  'href', 'src', 'alt', 'title', 'class', 'id', 'style', 'width', 'height',
+  'href', 'src', 'alt', 'title', 'class', 'id', 'width', 'height',
   'name', 'value', 'type', 'checked', 'disabled', 'readonly', 'placeholder',
   'target', 'rel', 'tabindex', 'role', 'aria-*', 'data-*',
   'for', 'cols', 'rows', 'span', 'colspan', 'rowspan',
@@ -401,19 +401,9 @@ export async function renderMarkdown(
   // Step 1: Parse and render with markdown-it
   let html = md.render(markdown, env)
 
-  // Step 2: Sanitize with DOMPurify (async)
-  html = await sanitizeHtml(html)
-
-  // Step 3: Syntax highlight code blocks (async)
-  html = await highlightAllCodeBlocks(html, opts.isDark ?? false)
-
-  // Step 4: Extract headings for TOC
-  const headings = extractHeadings(html)
-
-  // Step 5: Extract front matter
+  // Step 2: Inject front matter properties display BEFORE sanitization
+  // so that DOMPurify can sanitize the injected HTML as well
   const frontMatter = (md as any).__frontMatter?.value ?? null
-
-  // Step 6: Inject front matter properties display
   const features = opts.features ?? {}
   if (features.frontMatterDisplay !== false && frontMatter) {
     const fmHtml = renderFrontMatterDisplay(frontMatter)
@@ -421,6 +411,15 @@ export async function renderMarkdown(
       html = fmHtml + html
     }
   }
+
+  // Step 3: Sanitize with DOMPurify (async)
+  html = await sanitizeHtml(html)
+
+  // Step 4: Syntax highlight code blocks (async)
+  html = await highlightAllCodeBlocks(html, opts.isDark ?? false)
+
+  // Step 5: Extract headings for TOC
+  const headings = extractHeadings(html)
 
   return { html, headings, frontMatter }
 }
@@ -438,12 +437,9 @@ export function renderMarkdownSync(
   const env: Record<string, unknown> = {}
 
   let html = md.render(markdown, env)
-  html = sanitizeHtmlSync(html)
 
-  const headings = extractHeadings(html)
+  // Inject front matter display BEFORE sanitization
   const frontMatter = (md as any).__frontMatter?.value ?? null
-
-  // Inject front matter properties display
   const features = opts.features ?? {}
   if (features.frontMatterDisplay !== false && frontMatter) {
     const fmHtml = renderFrontMatterDisplay(frontMatter)
@@ -451,6 +447,10 @@ export function renderMarkdownSync(
       html = fmHtml + html
     }
   }
+
+  html = sanitizeHtmlSync(html)
+
+  const headings = extractHeadings(html)
 
   return { html, headings, frontMatter }
 }
