@@ -105,7 +105,6 @@ export function MarkdownPreview({
       if (matchedNote) {
         // Render the embedded note's content (sync for speed)
         try {
-          const { renderMarkdownSync } = require('@/lib/renderer')
           const result = renderMarkdownSync(matchedNote.content, { isDark })
           placeholder.innerHTML = result.html
           placeholder.removeAttribute('data-embed-placeholder')
@@ -133,10 +132,10 @@ export function MarkdownPreview({
     }
 
     // Attach zoom to all images in the preview
-    const images = containerRef.current.querySelectorAll('.markdown-preview img')
+    const images = containerRef.current.querySelectorAll('img')
     if (images.length > 0) {
       zoomRef.current = mediumZoom(images, {
-        background: isDark ? 'var(--background)' : 'var(--background)',
+        background: 'var(--background)',
         margin: 24,
       })
     }

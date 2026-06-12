@@ -203,42 +203,66 @@ export function NoteApp() {
     const previewEl = previewScrollRef.current
     if (!editorEl || !previewEl) return
 
-    // Get the actual scrollable containers
+    let cancelled = false
+    let cleanupFn: (() => void) | null = null
+
+    function attachSync(editorScroller: HTMLElement) {
+      const handleEditorScroll = () => {
+        if (syncScrollRef.current === 'preview') {
+          syncScrollRef.current = null
+          return
+        }
+        syncScrollRef.current = 'editor'
+        const maxScroll = editorScroller.scrollHeight - editorScroller.clientHeight
+        if (maxScroll <= 0) return
+        const ratio = editorScroller.scrollTop / maxScroll
+        const previewMaxScroll = previewEl!.scrollHeight - previewEl!.clientHeight
+        previewEl!.scrollTop = ratio * previewMaxScroll
+      }
+
+      const handlePreviewScroll = () => {
+        if (syncScrollRef.current === 'editor') {
+          syncScrollRef.current = null
+          return
+        }
+        syncScrollRef.current = 'preview'
+        const maxScroll = previewEl!.scrollHeight - previewEl!.clientHeight
+        if (maxScroll <= 0) return
+        const ratio = previewEl!.scrollTop / maxScroll
+        const editorMaxScroll = editorScroller.scrollHeight - editorScroller.clientHeight
+        editorScroller.scrollTop = ratio * editorMaxScroll
+      }
+
+      editorScroller.addEventListener('scroll', handleEditorScroll)
+      previewEl!.addEventListener('scroll', handlePreviewScroll)
+
+      cleanupFn = () => {
+        editorScroller.removeEventListener('scroll', handleEditorScroll)
+        previewEl!.removeEventListener('scroll', handlePreviewScroll)
+      }
+    }
+
+    // CM6 creates .cm-scroller asynchronously after mounting.
+    // Retry with a small delay if it's not available yet (race condition on note switch).
     const editorScroller = editorEl.querySelector('.cm-scroller') as HTMLElement | null
-    if (!editorScroller) return
-
-    const handleEditorScroll = () => {
-      if (syncScrollRef.current === 'preview') {
-        syncScrollRef.current = null
-        return
+    if (editorScroller) {
+      attachSync(editorScroller)
+    } else {
+      const retryTimer = setTimeout(() => {
+        if (cancelled) return
+        const scroller = editorEl.querySelector('.cm-scroller') as HTMLElement | null
+        if (scroller) attachSync(scroller)
+      }, 100)
+      return () => {
+        cancelled = true
+        clearTimeout(retryTimer)
+        cleanupFn?.()
       }
-      syncScrollRef.current = 'editor'
-      const maxScroll = editorScroller.scrollHeight - editorScroller.clientHeight
-      if (maxScroll <= 0) return
-      const ratio = editorScroller.scrollTop / maxScroll
-      const previewMaxScroll = previewEl.scrollHeight - previewEl.clientHeight
-      previewEl.scrollTop = ratio * previewMaxScroll
     }
-
-    const handlePreviewScroll = () => {
-      if (syncScrollRef.current === 'editor') {
-        syncScrollRef.current = null
-        return
-      }
-      syncScrollRef.current = 'preview'
-      const maxScroll = previewEl.scrollHeight - previewEl.clientHeight
-      if (maxScroll <= 0) return
-      const ratio = previewEl.scrollTop / maxScroll
-      const editorMaxScroll = editorScroller.scrollHeight - editorScroller.clientHeight
-      editorScroller.scrollTop = ratio * editorMaxScroll
-    }
-
-    editorScroller.addEventListener('scroll', handleEditorScroll)
-    previewEl.addEventListener('scroll', handlePreviewScroll)
 
     return () => {
-      editorScroller.removeEventListener('scroll', handleEditorScroll)
-      previewEl.removeEventListener('scroll', handlePreviewScroll)
+      cancelled = true
+      cleanupFn?.()
     }
   }, [viewMode, activeNoteId])
 
@@ -435,10 +459,13 @@ export function NoteApp() {
                       }
                     }}
                     onHeadingClick={(headingId) => {
-                      // Jump to the heading in the editor and switch to edit mode
+                      // Jump to the heading in the editor
                       if (editorViewRef.current) {
                         jumpToHeading(headingId)(editorViewRef.current)
-                        setViewMode('edit')
+                        // Only switch to edit mode if not already in split view
+                        if (viewMode === 'preview') {
+                          setViewMode('edit')
+                        }
                       }
                     }}
                     onTagClick={(tagName) => {
@@ -454,12 +481,16 @@ export function NoteApp() {
                       )
                       if (matchedNote) {
                         setActiveNoteId(matchedNote.id)
-                        setViewMode('edit')
+                        // Only switch to edit mode if currently in preview-only mode
+                        if (viewMode === 'preview') {
+                          setViewMode('edit')
+                        }
                       } else {
-                        // No matching note — create one and navigate to it
+                        // No matching note — create one using the store's createNote pattern
+                        const id = Date.now().toString(36) + Math.random().toString(36).substring(2, 8)
                         const now = Date.now()
                         const newNote: Note = {
-                          id: Date.now().toString(36) + Math.random().toString(36).substring(2, 8),
+                          id,
                           title: source,
                           content: heading ? `# ${heading}\n\n` : '',
                           createdAt: now,
@@ -467,9 +498,12 @@ export function NoteApp() {
                         }
                         useNotesStore.setState((state) => ({
                           notes: [newNote, ...state.notes],
-                          activeNoteId: newNote.id,
-                          viewMode: 'edit' as ViewMode,
+                          activeNoteId: id,
                         }))
+                        // Switch to edit mode if in preview-only; keep split view if already in split
+                        if (viewMode !== 'split') {
+                          setViewMode('edit')
+                        }
                         toast({ title: 'Note created', description: `Created "${source}" — click to start editing` })
                       }
                     }}

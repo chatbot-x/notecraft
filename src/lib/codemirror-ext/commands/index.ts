@@ -485,17 +485,23 @@ export const formatDocument: Command = (view): boolean => {
       }
     }
 
+    // Compute cursor position from the FORMATTED content before dispatching
+    const targetLineIndex = bestLine + 1
+    const totalLines = lines.length
+    const clampedLine = targetLineIndex > totalLines ? totalLines : targetLineIndex
+    // Calculate the position by summing line lengths up to the target line
+    let targetPos = 0
+    for (let i = 0; i < clampedLine - 1; i++) {
+      targetPos += lines[i].length + 1 // +1 for newline
+    }
+    const targetLineContent = lines[clampedLine - 1] || ''
+    const col = Math.min(cursorColumn, targetLineContent.length)
+    targetPos += col
+
     // Replace the entire document with formatted content
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: formatted },
-      // Restore cursor to the matching line and column
-      selection: (() => {
-        const targetLine = bestLine + 1
-        const totalLines = view.state.doc.lines
-        const linePos = view.state.doc.line(targetLine > totalLines ? totalLines : targetLine)
-        const col = Math.min(cursorColumn, linePos.text.length)
-        return EditorSelection.cursor(linePos.from + col)
-      })(),
+      selection: EditorSelection.cursor(targetPos),
     })
 
     view.focus()
@@ -542,15 +548,21 @@ export function createFormatCommand(options: FormatDocumentOptions): Command {
         }
       }
 
+      // Compute cursor position from the FORMATTED content before dispatching
+      const targetLineIndex = bestLine + 1
+      const totalLines = lines.length
+      const clampedLine = targetLineIndex > totalLines ? totalLines : targetLineIndex
+      let targetPos = 0
+      for (let i = 0; i < clampedLine - 1; i++) {
+        targetPos += lines[i].length + 1
+      }
+      const targetLineContent = lines[clampedLine - 1] || ''
+      const col = Math.min(cursorColumn, targetLineContent.length)
+      targetPos += col
+
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: formatted },
-        selection: (() => {
-          const targetLine = bestLine + 1
-          const totalLines = view.state.doc.lines
-          const linePos = view.state.doc.line(targetLine > totalLines ? totalLines : targetLine)
-          const col = Math.min(cursorColumn, linePos.text.length)
-          return EditorSelection.cursor(linePos.from + col)
-        })(),
+        selection: EditorSelection.cursor(targetPos),
       })
 
       view.focus()

@@ -52,7 +52,7 @@ export function Sidebar() {
     setCommandPaletteOpen,
   } = useNotesStore()
 
-  const filteredNotes = useMemo(() => getFilteredNotes(), [notes, searchQuery, getFilteredNotes])
+  const filteredNotes = useMemo(() => getFilteredNotes(), [notes, searchQuery])
 
   const handleCreateNote = () => {
     createNote()

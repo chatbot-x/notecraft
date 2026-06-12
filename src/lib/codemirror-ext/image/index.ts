@@ -170,21 +170,31 @@ const uploadReplacer = ViewPlugin.fromClass(class implements PluginValue {
   constructor(readonly view: EditorView) {}
 
   update(update: ViewUpdate) {
+    // Collect all replacements needed from this batch of transactions
+    const replacements: Array<{ id: string; url: string }> = []
     for (const tr of update.transactions) {
       for (const effect of tr.effects) {
         if (effect.is(uploadEffect) && effect.value.type === 'success') {
-          const { id, url } = effect.value
-          const searchText = `${UPLOAD_PREFIX}${id}`
-          const doc = this.view.state.doc.toString()
-          const pos = doc.indexOf(searchText)
-          if (pos !== -1) {
-            this.view.dispatch({
-              changes: { from: pos, to: pos + searchText.length, insert: url },
-            })
-          }
+          replacements.push(effect.value)
         }
       }
     }
+
+    if (replacements.length === 0) return
+
+    // Defer dispatch to avoid dispatching during update cycle
+    setTimeout(() => {
+      for (const { id, url } of replacements) {
+        const searchText = `${UPLOAD_PREFIX}${id}`
+        const doc = this.view.state.doc.toString()
+        const pos = doc.indexOf(searchText)
+        if (pos !== -1) {
+          this.view.dispatch({
+            changes: { from: pos, to: pos + searchText.length, insert: url },
+          })
+        }
+      }
+    }, 0)
   }
 }, {})
 

@@ -46,7 +46,9 @@ export function CommandPalette() {
   const listRef = useRef<HTMLDivElement>(null)
 
   const toggleDark = () => {
+    const newIsDark = !document.documentElement.classList.contains('dark')
     document.documentElement.classList.toggle('dark')
+    useNotesStore.setState({ isDark: newIsDark })
   }
 
   const commands: Command[] = [
