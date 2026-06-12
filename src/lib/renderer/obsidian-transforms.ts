@@ -22,9 +22,8 @@
  *   markdown-it is the engine, remark is the reference implementation.
  *   Each sub-transform is a pure function that could be independently tested.
  *
- * Wikilinks have been removed from this pipeline. Embeds are now a
- * standalone transform that directly matches ![[...]] without depending
- * on any wikilink handling.
+ * Embeds are a standalone transform that directly matches ![[...]] patterns
+ * without depending on any other syntax handling.
  */
 
 import type MarkdownIt from 'markdown-it'

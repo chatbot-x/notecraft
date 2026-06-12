@@ -15,8 +15,7 @@
  * - `![[note|label]]` — embed with display label (Obsidian 1.x+)
  *
  * The embed syntax is `![[...]]` — the `!` prefix followed by double brackets
- * uniquely identifies it. This is a standalone parser that does not depend on
- * any wikilink parser.
+ * uniquely identifies it. This is a standalone parser.
  *
  * ## Inline Parser Design
  *

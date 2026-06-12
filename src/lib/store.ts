@@ -94,7 +94,7 @@ interface NoteCraft {
 const app: NoteCraft = {
   editor: "CodeMirror 6",
   renderer: "markdown-it",
-  features: ["wikilinks", "callouts", "math", "mermaid", "katex", "emoji"]
+  features: ["callouts", "math", "mermaid", "katex", "emoji"]
 }
 \`\`\`
 

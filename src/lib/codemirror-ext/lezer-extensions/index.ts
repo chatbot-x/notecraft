@@ -43,10 +43,8 @@
  *
  * ## Migration Note
  *
- * Wikilinks (`[[...]]`) have been removed. Embeds (`![[...]]`) are now a
- * standalone transform that doesn't depend on wikilinks. The `![[` prefix
- * is matched directly by the Embed parser without needing a Wikilink parser
- * to exist first.
+ * Embeds (`![[...]]`) are a standalone transform. The `![[` prefix
+ * is matched directly by the Embed parser.
  */
 
 import type { MarkdownExtension } from '@lezer/markdown'

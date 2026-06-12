@@ -11,7 +11,7 @@
  * that shows the embed target and a "Loading embed..." indicator. When the
  * cursor enters the embed range, the raw syntax is shown.
  *
- * Image embeds (![[image.png|300]]) are handled by the wikilinks plugin.
+ * Image embeds (![[image.png|300]]) are handled by the embed-images plugin.
  *
  * ## Level 2: Tree-based scanning
  *
@@ -171,7 +171,7 @@ function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
           const filePath = pipeIdx > -1 ? targetText.slice(0, pipeIdx) : targetText
           const label = pipeIdx > -1 ? targetText.slice(pipeIdx + 1) : undefined
 
-          // Skip image embeds — handled by wikilinks plugin
+          // Skip image embeds — handled by embed-images plugin
           if (isImagePath(filePath)) return
 
           usedTree = true

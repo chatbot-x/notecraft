@@ -12,7 +12,7 @@
  * ### Inline Features (ViewPlugin)
  * - `heading-marks.ts`    — Hide `#` on headings + heading size styling
  * - `emphasis-marks.ts`   — Hide `**`, `*`, `_`, `__`, `~~` delimiters
- * - `wikilinks.ts`        — Style ![[embed images]] with thumbnail widgets
+ * - `embed-images.ts`    — Style ![[embed images]] with thumbnail widgets
  * - `links.ts`            — Style [links](url) and ![images](url)
  * - `checkboxes.ts`       — Interactive checkbox widgets
  * - `inline-code.ts`      — Inline code background + hide backticks
@@ -63,7 +63,7 @@ import type { HybridRenderOptions } from './shared'
 // Feature plugins — ViewPlugin-based (inline decorations)
 import { headingMarksPlugin } from './heading-marks'
 import { emphasisMarksPlugin } from './emphasis-marks'
-import { embedImagesPlugin } from './wikilinks'
+import { embedImagesPlugin } from './embed-images'
 import { linksPlugin } from './links'
 import { checkboxesPlugin } from './checkboxes'
 import { inlineMathPlugin } from './math'

@@ -35,8 +35,8 @@ export const hybridRenderTheme = EditorView.baseTheme({
     fontSize: '0.85em',
   },
 
-  // ─── Wikilink label ─────────────────────────────────────────────────────
-  '.cm-hybrid-wikilink-label': {
+  // ─── Embed label (non-image embed targets) ─────────────────────────────
+  '.cm-hybrid-embed-label': {
     color: '#7c5cfc',
     textDecoration: 'underline',
     textDecorationStyle: 'dotted',
@@ -487,7 +487,7 @@ export const hybridRenderTheme = EditorView.baseTheme({
   // ─── Dark Mode Overrides ───────────────────────────────────────────────
   // ────────────────────────────────────────────────────────────────────────
 
-  '&dark .cm-hybrid-wikilink-label': {
+  '&dark .cm-hybrid-embed-label': {
     color: '#a78bfa',
   },
   '&dark .cm-hybrid-link-label': {

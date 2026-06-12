@@ -3,7 +3,7 @@
  *
  * This is a FALLBACK atomic ranges extension. Most decoration plugins now
  * provide their own atomic ranges via the `provide` pattern on their
- * ViewPlugin definition (e.g., wikilinksPlugin, tagsPlugin, linksPlugin).
+ * ViewPlugin definition (e.g., embedImagesPlugin, tagsPlugin, linksPlugin).
  *
  * This extension handles any remaining decoration types that need atomic
  * ranges but don't self-provide (e.g., embed transclusions from the

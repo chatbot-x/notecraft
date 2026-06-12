@@ -29,7 +29,7 @@ import { syntaxTree } from '@codemirror/language'
 import {
   hiddenMark,
   activeMark,
-  wikilinkLabelMark,
+  embedLabelMark,
   isCursorInRange,
   isImagePath,
   EMBED_IMAGE_RE,
@@ -159,10 +159,10 @@ function buildEmbedImageDecorations(view: EditorView): DecorationSet {
               if (child.name === 'EmbedTarget') {
                 // Show only the file path part (before |)
                 if (pipeIdx > -1) {
-                  ranges.push(wikilinkLabelMark.range(child.from, child.from + filePath.length))
+                  ranges.push(embedLabelMark.range(child.from, child.from + filePath.length))
                   ranges.push(hiddenMark.range(child.from + filePath.length, child.to))
                 } else {
-                  ranges.push(wikilinkLabelMark.range(child.from, child.to))
+                  ranges.push(embedLabelMark.range(child.from, child.to))
                 }
               }
               return false

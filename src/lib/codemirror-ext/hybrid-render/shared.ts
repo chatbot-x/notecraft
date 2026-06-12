@@ -35,7 +35,7 @@ export function isCursorOnLine(state: EditorState, lineFrom: number, lineTo: num
 /**
  * Collect "skip ranges" — ranges inside code blocks and inline code where
  * regex-based plugins should NOT match. This prevents false positives like
- * a #tag inside a code fence or a [[wikilink]] inside inline code.
+ * a #tag inside a code fence or an ![[embed]] inside inline code.
  *
  * Returns sorted array of { from, to } ranges.
  */
@@ -145,9 +145,9 @@ export const fadedMark = Decoration.mark({
   class: 'cm-hybrid-faded',
 })
 
-/** Wikilink label styling */
-export const wikilinkLabelMark = Decoration.mark({
-  class: 'cm-hybrid-wikilink-label',
+/** Embed label styling (for non-image embed targets) */
+export const embedLabelMark = Decoration.mark({
+  class: 'cm-hybrid-embed-label',
 })
 
 /** Link label styling */

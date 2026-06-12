@@ -81,7 +81,7 @@ testGroup('Embed Plugin', () => {
   test('embed with block ref ![[note#^blockid]]', md, '![[Doc#^abc]]', html =>
     html.includes('data-embed-block="abc"')
   )
-  test('embeds are standalone (no wikilink dependency)', md, '![[My Note]]', html =>
+  test('embeds are standalone', md, '![[My Note]]', html =>
     html.includes('data-embed-src="My Note"') && html.includes('embed-note')
   )
 })

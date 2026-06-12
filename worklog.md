@@ -134,3 +134,45 @@ Stage Summary:
 - Prisma/DB layer completely removed (app is purely client-side)
 - Clean dependency tree: only packages actually used by the codebase remain
 - Build compiles and runs successfully
+
+---
+Task ID: 5
+Agent: Super Z (main)
+Task: Remove all wikilink remnants + thorough source code cleanup
+
+Work Log:
+- Audited entire codebase for wikilink references — found 25+ occurrences across 10+ files
+- Renamed `src/lib/codemirror-ext/hybrid-render/wikilinks.ts` → `embed-images.ts` (accurately describes what it does)
+- Updated import in `hybrid-render/index.ts` from `./wikilinks` to `./embed-images`
+- Updated module header comment in `index.ts` referencing `wikilinks.ts`
+- Renamed `wikilinkLabelMark` → `embedLabelMark` in `shared.ts` ( Decoration mark for non-image embed targets)
+- Renamed CSS class `cm-hybrid-wikilink-label` → `cm-hybrid-embed-label` in `shared.ts` and `theme.ts`
+- Updated comments in `embed-transclusions.ts` from "wikilinks plugin" to "embed-images plugin"
+- Updated comment in `atomic-ranges.ts` from `wikilinksPlugin` to `embedImagesPlugin`
+- Updated comment in `shared.ts` from `[[wikilink]]` to `![[embed]]`
+- Removed "wikilinks" from `store.ts` features array
+- Removed 25 lines of `.obsidian-wikilink` CSS from `globals.css` (light + dark styles)
+- Updated `obsidian-transforms.ts` header comment (removed wikilink reference)
+- Updated `lezer-extensions/index.ts` migration note (simplified)
+- Updated `lezer-extensions/embeds.ts` comment (removed wikilink dependency mention)
+- Updated `obsidian-transforms.test.ts` test name from "embeds are standalone (no wikilink dependency)" to "embeds are standalone"
+- Updated README.md:
+  - Removed wikilinks from Features list and Hybrid Rendering description
+  - Removed `markdown-it-wikilinks` row from NPM plugins table
+  - Removed "Wikilink Enhancements" section entirely
+  - Updated Embed Plugin architecture description
+  - Renumbered all plugin tables (10 NPM + 9 custom + 4 post-processing = 23 total)
+  - Updated pipeline diagram (24 → 23 plugins)
+  - Removed wikilink-related callback, feature flag, and data attribute references
+  - Removed `markdown-it-wikilinks` from References & Credits
+  - Replaced "wikilinks" with "embeds" in Hybrid Render description
+- Final verification: `npx next build` succeeds, zero remaining wikilink references in src/
+
+Stage Summary:
+- All wikilink remnants completely removed from source code
+- File renamed for clarity: `wikilinks.ts` → `embed-images.ts`
+- CSS class renamed: `cm-hybrid-wikilink-label` → `cm-hybrid-embed-label`
+- Decoration mark renamed: `wikilinkLabelMark` → `embedLabelMark`
+- 25 lines of dead wikilink CSS removed from globals.css
+- README fully updated (23 plugins, no wikilink mentions)
+- Build passes cleanly
