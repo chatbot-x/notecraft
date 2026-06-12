@@ -30,40 +30,11 @@
  */
 
 import type MarkdownIt from 'markdown-it'
+import { CALLOUT_TYPES, CALLOUT_ALIASES, DEFAULT_CALLOUT_ICON } from './callout-types'
 
 export interface AdmonitionPluginOptions {
   /** Prefix for info string detection. Default: "ad-" */
   prefix?: string
-}
-
-// Callout type icons (same as callout-plugin.ts)
-const CALLOUT_ICONS: Record<string, string> = {
-  note:      '\u270E',       // ✎
-  info:      '\u2139',       // ℹ
-  tip:       '\u261D',       // ☝
-  success:   '\u2714',       // ✔
-  question:  '\u2753',       // ❓
-  warning:   '\u26A0',       // ⚠
-  failure:   '\u2718',       // ✘
-  danger:    '\u26D4',       // ⛔
-  bug:       '\u{1F41B}',    // 🐛
-  example:   '\u{1F4CB}',    // 📋
-  quote:     '\u275D',       // ❝
-  abstract:  '\u{1F4D1}',    // 📑
-  todo:      '\u{1F4DD}',    // 📝
-  important: '\u{1F525}',    // 🔥
-}
-
-// Type aliases (same as callout-plugin.ts)
-const TYPE_ALIASES: Record<string, string> = {
-  summary: 'abstract', tldr: 'abstract',
-  hint: 'tip',
-  check: 'success', done: 'success',
-  help: 'question', faq: 'question',
-  caution: 'warning', attention: 'warning',
-  fail: 'failure', missing: 'failure',
-  error: 'danger',
-  cite: 'quote',
 }
 
 // Parse the first line of content for a title
@@ -121,9 +92,10 @@ export default function admonitionPlugin(md: MarkdownIt, opts: AdmonitionPluginO
       return defaultFenceRenderer(tokens, idx, opts, env, self)
     }
 
-    // Resolve type alias
-    const resolvedType = TYPE_ALIASES[rawType] ?? rawType
-    const icon = CALLOUT_ICONS[resolvedType] ?? '\u270E' // default: ✎
+    // Resolve type alias (shared with callout plugin)
+    const resolvedType = CALLOUT_ALIASES[rawType] ?? rawType
+    const meta = CALLOUT_TYPES[resolvedType]
+    const icon = meta ? meta.icon : DEFAULT_CALLOUT_ICON
 
     // Parse content
     const content = token.content.trim()

@@ -43,7 +43,6 @@
 
 import MarkdownIt from 'markdown-it'
 import katex from '@traptitech/markdown-it-katex'
-import wikilinks from './wikilink-plugin'
 import footnote from 'markdown-it-footnote'
 import taskLists from 'markdown-it-task-lists'
 import sub from 'markdown-it-sub'
@@ -69,12 +68,8 @@ function getPurify() {
 
 // Custom plugins (backported from remark ecosystem / built from scratch)
 import mermaidPlugin from './mermaid-plugin'
-import calloutPlugin from './callout-plugin'
-import commentPlugin from './comment-plugin'
+import obsidianTransforms from './obsidian-transforms'
 import headingIdPlugin from './heading-id-plugin'
-import tagPlugin from './tag-plugin'
-import embedPlugin from './embed-plugin'
-import blockRefPlugin from './block-ref-plugin'
 import admonitionPlugin from './admonition-plugin'
 import { highlightAllCodeBlocks } from './code-highlighter'
 import { renderFrontMatterDisplay } from './frontmatter-display'
@@ -269,12 +264,6 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
 
   if (features.deflist !== false) md.use(deflist)
 
-  // ─── Obsidian Comments (%%hidden%%) ───────────────────────────────
-
-  if (features.comments !== false) {
-    md.use(commentPlugin, { strip: true })
-  }
-
   // ─── Math (KaTeX) ────────────────────────────────────────────────
 
   if (features.math !== false) {
@@ -290,12 +279,6 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     md.use(mermaidPlugin)
   }
 
-  // ─── Obsidian-style Callouts ─────────────────────────────────────
-
-  if (features.callouts !== false) {
-    md.use(calloutPlugin)
-  }
-
   // ─── Code-block Admonitions (~~~ad-note) ─────────────────────────
 
   if (features.admonitions !== false) {
@@ -308,34 +291,29 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     md.use(headingIdPlugin)
   }
 
-  // ─── Wikilinks ([[note]], [[note#heading]], [[note|alias]]) ──────
+  // ─── Obsidian Transforms (merged core-rule pipeline) ───────────────
+  // Replaces 6 separate core rules with a single `obsidian_transforms`
+  // rule that does one walk over inline tokens (comment → wikilink →
+  // embed → tag sub-passes) then block-level transforms (callout,
+  // block-ref). This eliminates 3 full iterations over state.tokens.
 
-  if (features.wikilinks !== false) {
-    md.use(wikilinks, {
-      baseURL: wikilinkBase,
-      uriSuffix: '',
-    })
-  }
-
-  // ─── Obsidian Embeds (![[note]], ![[img.png|300]]) ───────────────
-  // Must be registered AFTER wikilinks so it can detect the pattern
-  // of "!" text token followed by wikilink tokens and transform them.
-
-  if (features.embeds !== false) {
-    md.use(embedPlugin, { wikilinkBase })
-  }
-
-  // ─── Obsidian Tags (#tag, #nested/tag) ───────────────────────────
-
-  if (features.tags !== false) {
-    md.use(tagPlugin)
-  }
-
-  // ─── Obsidian Block References (^block-id) ───────────────────────
-
-  if (features.blockRefs !== false) {
-    md.use(blockRefPlugin)
-  }
+  md.use(obsidianTransforms, {
+    commentStrip: true,
+    wikilinkBaseURL: wikilinkBase,
+    wikilinkURISuffix: '',
+    embedWikilinkBase: wikilinkBase,
+    tagClass: 'obsidian-tag',
+    blockRefIndicatorClass: 'block-ref-id',
+    blockRefShowIndicator: true,
+    features: {
+      comments: features.comments !== false,
+      wikilinks: features.wikilinks !== false,
+      embeds: features.embeds !== false,
+      tags: features.tags !== false,
+      callouts: features.callouts !== false,
+      blockRefs: features.blockRefs !== false,
+    },
+  })
 
   // ─── Custom Renderers ────────────────────────────────────────────
 
