@@ -278,11 +278,489 @@ NoteCraft builds a rich set of CodeMirror 6 extensions, some based on existing o
 | Extension | Description |
 |-----------|-------------|
 | **Slash Commands** | Notion-style `/` menu built on [`@codemirror/autocomplete`](https://github.com/codemirror/autocomplete) — type `/` to insert any block element, heading, list, or callout |
-| **Hybrid Render** | Obsidian-style Live Preview using CM6 Decoration API — 5 decoration types: interactive checkboxes, embeds, image thumbnails, math preview, styled links |
+| **Hybrid Render** | See the full [Hybrid Render System](#hybrid-render-system--architecture--upgrade-guide) section below — 21-plugin Obsidian-style Live Preview using CM6 Decoration API |
 | **Heading Slug Utilities** | Copy/set/remove heading IDs, jump-to-heading by slug, document heading scanner |
 | **Slug Input Panel** | CM6 panel-based heading ID input UI (replaces browser `prompt()`) with Enter/Escape keyboard support |
 | **Lezer Grammar Extensions** | Custom syntax highlighting for Obsidian-flavored markdown: callouts, comments, embeds, tags, block references, front matter |
 | **Editor Theme** | BaseTheme for toolbar container, autocomplete dropdowns, and hybrid render decorations |
+
+---
+
+## Hybrid Render System — Architecture & Upgrade Guide
+
+This is the most feature-complete CM6 decoration-based hybrid renderer in the ecosystem. It provides Obsidian-style Live Preview by layering `Decoration.mark()` and `Decoration.widget()` on top of the raw Markdown source — hiding syntax when the cursor is away, revealing it when the cursor approaches. It does **not** use ProseMirror, contenteditable, or a dual-engine approach.
+
+All source files live in [`src/lib/codemirror-ext/hybrid-render/`](src/lib/codemirror-ext/hybrid-render/).
+
+### What This Is in the Ecosystem
+
+There are four known architectural tiers for Markdown WYSIWYG in CodeMirror. Understanding these is critical for evaluating upgrade opportunities — a solution from a different tier can provide ideas but is never a direct drop-in replacement.
+
+| Tier | Approach | Cursor Model | Examples | NoteCraft Uses This? |
+|------|----------|-------------|----------|---------------------|
+| **1. Decoration-Based** | CM6 `Decoration` API on top of raw text | Native CM6 cursor, decorations hide/show syntax | Atomic Editor, codemirror-live-markdown, codemirror-markdown-hybrid, codemirror-rich-markdoc | **Yes** |
+| **2. Obsidian-Flavored CM6** | Tier 1 + Obsidian-specific extensions | Same as Tier 1 | @type32/codemirror-rich-obsidian, codemirror-for-writers | Partial (inspiration only) |
+| **3. ProseMirror/Dual-Engine** | ProseMirror document model under CM6 | ProseMirror schema, node types | Milkdown, Gravity UI, MDXEditor | No |
+| **4. Contenteditable** | Raw contenteditable div with custom parser | Browser native, fragile | Vditor, Cherry Markdown, Muya/Mark Text | No |
+
+**Key implication:** If you find a new repo that uses ProseMirror `Schema`, `NodeType`, or `contenteditable`, it is a different tier. Extract ideas from it, but do not attempt to integrate its code — the architectural gap is too wide.
+
+### System Architecture
+
+```
+                         ┌──────────────────────────────────────────────────┐
+                         │               Editor State                       │
+                         │                                                  │
+                         │  ┌─────────────────┐  ┌───────────────────────┐  │
+                         │  │ cursorPosition   │  │ editorFocusField      │  │
+                         │  │ Field            │  │ (via focusChange-     │  │
+                         │  │ (pre-computed    │  │  Effect)              │  │
+                         │  │  cursor info)    │  └──────────┬────────────┘  │
+                         │  └────────┬────────┘             │               │
+                         │           │                      │               │
+                         │  ┌────────▼──────────────────────▼────────────┐  │
+                         │  │      shouldShowSource()                    │  │
+                         │  │      shouldShowSourceForLine()             │  │
+                         │  │      (THE single decision function)        │  │
+                         │  └────────┬───────────────────────────────────┘  │
+                         │           │                                       │
+                         │           │  Called by EVERY feature plugin      │
+                         │           │                                       │
+                         │  ┌────────▼───────────────────────────────────┐  │
+                         │  │          Feature Plugins                    │  │
+                         │  │                                            │  │
+                         │  │  ViewPlugins (inline):                     │  │
+                         │  │   heading-marks  emphasis-marks             │  │
+                         │  │   embed-images   links                     │  │
+                         │  │   checkboxes     inline-code               │  │
+                         │  │   tags           callouts                  │  │
+                         │  │   code-blocks    blockquote-marks          │  │
+                         │  │   comments       block-refs                │  │
+                         │  │   embed-transclusions  admonitions         │  │
+                         │  │   tables          footnotes                │  │
+                         │  │   inline-math                              │  │
+                         │  │                                            │  │
+                         │  │  StateFields (block-level):                │  │
+                         │  │   hr              display-math             │  │
+                         │  │   frontmatter                               │  │
+                         │  └────────┬───────────────────────────────────┘  │
+                         │           │                                       │
+                         │           │  Decorations + Atomic Ranges          │
+                         │           │                                       │
+                         │  ┌────────▼───────────────────────────────────┐  │
+                         │  │       Editor View (rendered output)         │  │
+                         │  └────────────────────────────────────────────┘  │
+                         │                                                  │
+                         │  ┌────────────────────────────────────────────┐  │
+                         │  │  Cross-cutting Concerns                     │  │
+                         │  │                                             │  │
+                         │  │  drag-state.ts    → Drag suppression        │  │
+                         │  │  shared.ts        → Regex, decorations,     │  │
+                         │  │                      skip ranges            │  │
+                         │  │  atomic-ranges.ts → Fallback atomic ranges  │  │
+                         │  │  theme.ts         → ~90 CSS rules           │  │
+                         │  │  index.ts         → Orchestrator + flags    │  │
+                         │  └────────────────────────────────────────────┘  │
+                         └──────────────────────────────────────────────────┘
+```
+
+### File Map — What Each File Does and When to Touch It
+
+#### Cross-Cutting Modules (touched when changing system-wide behavior)
+
+| File | CM6 Type | Purpose | Touch when... |
+|------|----------|---------|---------------|
+| `cursor-awareness.ts` | StateField + Facet + ViewPlugin | Central cursor/focus/drag decision engine. Pre-computes active lines and ranges. Exports `shouldShowSource()`, `shouldShowSourceForLine()`, `livePreviewEnabled` Facet, `editorFocusField`, `focusMonitorPlugin` | Adding new cursor-awareness logic (e.g., multi-cursor heuristics, proximity-based reveal), changing the global "show source vs rendered" decision, adding a new global toggle |
+| `shared.ts` | Utility module | Regex patterns (`EMBED_IMAGE_RE`, `TAG_RE`, `INLINE_MATH_RE`, etc.), singleton `Decoration.mark()` instances (`hiddenMark`, `activeMark`, `fadedMark`, etc.), `collectSkipRanges()`, `isInRangeList()`, `HybridRenderOptions` feature-flag type | Adding a new regex pattern, adding a new reusable decoration mark, changing feature flags |
+| `drag-state.ts` | StateField + DOM handlers | Tracks mouse-dragging state via `startDragSelect`/`endDragSelect` StateEffects. Exports `checkUpdateAction()` which returns `'rebuild'`/`'skip'`/`'none'` — the tri-state that ALL ViewPlugins call in their `update()` | Changing drag behavior, adding touch support, modifying the rebuild/skip/none decision logic |
+| `atomic-ranges.ts` | `EditorView.atomicRanges` provider | Fallback atomic ranges for embed images and tags. Most plugins now self-provide atomic ranges via the `provide` key — this is a safety net for any that don't | Adding new decoration types that need atomic ranges but don't self-provide (prefer self-providing instead) |
+| `theme.ts` | `EditorView.baseTheme` | ~90 CSS rules with `cm-hybrid-*` naming convention. Includes CSS transitions for smooth hide/show and `&dark` selectors for dark mode | Adding visual styling for any new decoration class, changing colors/spacing/transitions, adding dark mode overrides |
+| `index.ts` | Orchestrator function | `hybridRender(opts?)` factory returns `Extension[]` based on feature flags. Imports and wires all 21 plugins. Re-exports key APIs for external consumption | Adding a new plugin to the system, changing feature-flag wiring, changing the order of extensions |
+
+#### Feature Plugins — ViewPlugin-based (inline decorations, can access `view`)
+
+| File | Syntax Handled | Key Patterns | Self-Provides Atomic Ranges? | Touch when... |
+|------|---------------|--------------|------------------------------|---------------|
+| `heading-marks.ts` | `# H1-H6` | Tree scan (`HeaderMark`, `ATXHeading*`), `shouldShowSourceForLine()`, heading size CSS classes | No | Changing heading mark hiding behavior, adding new heading level styles |
+| `emphasis-marks.ts` | `**bold**`, `*italic*`, `~~strike~~` | Two-pass tree scan (collect parents, then mark nodes), `supplementMidTypingEmphasis()` regex fallback for mid-typing flicker prevention | No | Changing emphasis detection, adding new emphasis types (underline, highlight), fixing mid-typing flicker |
+| `embed-images.ts` | `![[img.png\|300]]` | Dual scan (Lezer `Image` then regex `EMBED_IMAGE_RE`), image thumbnail `WidgetType` with `Image` node | Yes (via `provide`) | Adding new embed types, changing image thumbnail rendering, adding resize handles |
+| `links.ts` | `[label](url)`, `![alt](url)` | Tree scan (`Link`, `Image` nodes), `ImageThumbnailWidget` with dimension cache (Atomic Editor pattern) | Yes (via `provide`, filter to Image replace decorations only) | Changing link styling, adding link preview on hover, changing image thumbnail behavior |
+| `checkboxes.ts` | `- [x]`, `- [ ]` | Tree scan (`Task`/`TaskMarker` nodes), interactive checkbox `WidgetType` with click-to-toggle dispatching `toggleCheckbox` StateEffect | No | Changing checkbox rendering, adding subtask support, changing toggle behavior |
+| `inline-code.ts` | `` `code` `` | Tree scan (`InlineCode` node), background styling, backtick hiding | No | Changing inline code rendering, adding syntax highlighting inside inline code |
+| `tags.ts` | `#tag`, `#nested/tag` | Dual scan (Lezer then regex `TAG_RE`), `collectSkipRanges()` for code-block exclusion | No | Changing tag rendering, adding tag autocomplete integration, fixing false positives |
+| `callouts.ts` | `> [!note] Title` | Regex scan (`CALLOUT_HEADER_RE`), line decorations per callout line, marker badges | No | Adding new callout types, changing callout rendering, adding foldable callouts |
+| `code-blocks.ts` | `` ```lang `` | Tree scan (`FencedCode` node), fence hiding, language badge `WidgetType` (singleton per language) | No | Changing code block rendering, adding fold/collapse, changing language badge |
+| `blockquote-marks.ts` | `> quote` | Tree scan (`QuoteMark` node), fade styling | No | Changing blockquote rendering, adding nested blockquote support |
+| `comments.ts` | `%%hidden%%` | Dual scan (Lezer then regex `COMMENT_RE`), hide content + singleton indicator widget | No | Changing comment rendering, adding comment toggle |
+| `block-refs.ts` | `^block-id` | Regex scan (`BLOCK_REF_RE`), clickable badge styling | No | Changing block reference rendering, adding block reference navigation |
+| `embed-transclusions.ts` | `![[note]]`, `![[note#heading]]`, `![[note#^id]]` | Regex scan (`EMBED_TRANSCLUDE_RE`), transclusion widget with header/content/name sections | No | Adding transclusion content resolution, changing embed widget appearance |
+| `admonitions.ts` | `~~~ad-note` | Regex scan (`ADMONITION_FENCE_RE`), reuses callout CSS classes | No | Adding new admonition types, changing admonition rendering |
+| `tables.ts` | `\| header \|` | Dual scan (Lezer `Table` node then regex), column alignment detection from separator line, `changeAffectsTables()` skip guard, self-providing atomic ranges, `TableBadgeWidget` with structure-only `eq()` and badge cache | Yes (via `provide`) | Upgrading table cell editing, adding column resize, changing alignment detection, adding sort |
+| `footnotes.ts` | `[^1]`, `^[inline]`, `[^1]: def` | Dual scan (Lezer `Footnote`/`FootnoteRef` then regex), definition line decorations | Yes (via `provide`) | Adding footnote preview on hover, changing footnote reference rendering |
+| `math.ts` (inline) | `$...$` | Regex scan (`INLINE_MATH_RE`), hide `$` delimiters + math styling. Lazy-loads KaTeX | No | Changing math rendering, adding MathML output, fixing Safari regex issues |
+
+#### Feature Plugins — StateField-based (block-level layout-changing decorations)
+
+StateFields are used when the decoration changes line layout (block replace). They **cannot** access `view` directly, so they use `editorFocusField` (updated via `focusChangeEffect`) and their own `checkFieldAction()` function instead of `checkUpdateAction()`.
+
+| File | Syntax Handled | Key Patterns | Touch when... |
+|------|---------------|--------------|---------------|
+| `hr.ts` | `---`, `***`, `___` | Tree scan (`HorizontalRule` node), singleton `HorizontalRuleWidget` (all HRs look identical → one DOM element reused), `shouldShowSourceForLine()` | Changing HR rendering, adding themed HR styles |
+| `math.ts` (display) | `$$...$$` | Regex scan (`DISPLAY_MATH_RE`), `MathPreviewWidget` with KaTeX rendering, `checkFieldAction()` for StateField drag-awareness | Changing display math rendering, adding equation numbering |
+| `frontmatter.ts` | `---\nyaml\n---` | Tree scan (`Frontmatter` node) + regex fallback, `CollapsedFrontmatterWidget`/`ExpandedFrontmatterWidget` with toggle via `toggleFrontmatter` StateEffect, `frontmatterExpandedField` tracks collapse state, click handler on toggle | Changing frontmatter rendering, adding property type icons, adding inline editing |
+
+### Key Abstractions Every Plugin Uses
+
+These are the 6 concepts you must understand before modifying any plugin:
+
+1. **`shouldShowSource(state, from, to)` → `boolean`** — The single decision function. Returns `true` when the cursor/selection overlaps `[from, to)`, the editor is focused, live preview is enabled, and no drag is in progress. Every plugin calls this to decide "show raw syntax or rendered form?" **Never use `isCursorInRange()` directly** — it does not handle drag suppression, focus, or the live-preview toggle.
+
+2. **`shouldShowSourceForLine(state, lineFrom, lineTo)` → `boolean`** — The line-level variant. Uses pre-computed active line numbers from `cursorPositionField` for better performance on long documents. Use this for line-level plugins (headings, blockquotes, HR) instead of the range variant.
+
+3. **`checkUpdateAction(update)` → `'rebuild' | 'skip' | 'none'`** — Called by every ViewPlugin's `update()` method. Returns `'rebuild'` when decorations need recomputing (doc changed, viewport changed, selection changed, drag ended), `'skip'` during active drag (prevents flicker), `'none'` when nothing relevant changed. StateFields use their own `checkFieldAction(tr)` with equivalent logic.
+
+4. **`collectSkipRanges(state, from, to)` → `Array<{from, to}>`** — Returns ranges inside code blocks and inline code where regex-based plugins should NOT match. Without this, a `#tag` inside a code fence would get a badge decoration. Always call this in regex-scan loops and check with `isInRangeList()`.
+
+5. **Self-providing atomic ranges via `provide` key** — When a ViewPlugin's decorations should make the cursor treat decorated ranges as atomic units (skip over them with arrow keys), the plugin adds a `provide` key on `ViewPlugin.fromClass` that maps its `DecorationSet` to `EditorView.atomicRanges`. This is preferred over adding ranges to the centralized `atomic-ranges.ts` fallback because it keeps plugins self-contained. Example from `tables.ts`:
+   ```ts
+   provide: (plugin) =>
+     EditorView.atomicRanges.of((view) => {
+       return view.plugin(plugin)?.decorations || Decoration.none
+     }),
+   ```
+
+6. **Singleton `Decoration.mark()` instances** — CM6 reuses decoration objects by identity for efficient diffing. Creating new `Decoration.mark()` instances on every rebuild defeats this optimization. Always use the pre-created instances from `shared.ts` (`hiddenMark`, `activeMark`, `fadedMark`, etc.) or create module-level singletons. For `WidgetType`, implement `eq()` with structure-only comparison so CM6 reuses the DOM.
+
+### How to Add a New Plugin (Step-by-Step Recipe)
+
+1. **Create `your-feature.ts`** in `src/lib/codemirror-ext/hybrid-render/`. Choose the plugin type:
+   - **ViewPlugin** — for inline decorations (hiding syntax markers, styling text). Can access `view` for DOM measurements. Use `checkUpdateAction(update)` in `update()`.
+   - **StateField** — for block-level layout-changing decorations (replacing entire blocks with widgets). Cannot access `view` directly; use `editorFocusField` and `checkFieldAction(tr)`.
+
+2. **Import cursor-awareness:**
+   ```ts
+   import { shouldShowSource, shouldShowSourceForLine } from './cursor-awareness'
+   import { checkUpdateAction } from './drag-state'  // ViewPlugin only
+   ```
+
+3. **Choose your scanning strategy:**
+   - **Tree-first** (preferred): Use `syntaxTree(state).iterate()` to find Lezer nodes. More accurate, handles nesting correctly. Start here.
+   - **Regex fallback** (for nodes Lezer doesn't parse): Use `collectSkipRanges()` + `isInRangeList()` to avoid false positives in code blocks. Add your regex to `shared.ts`.
+   - **Dual scan** (best of both): Try tree scan first. If no tree nodes found, fall back to regex. This is the pattern used by `tables.ts`, `footnotes.ts`, `tags.ts`.
+
+4. **Use singleton decorations from `shared.ts`** or define new ones:
+   ```ts
+   import { hiddenMark, activeMark } from './shared'
+   // OR define new ones at module level:
+   const myMark = Decoration.mark({ class: 'cm-hybrid-my-feature' })
+   ```
+
+5. **Add self-providing atomic ranges** if your decoration should be cursor-atomic:
+   ```ts
+   export const myPlugin = ViewPlugin.fromClass(class { ... }, {
+     decorations: (v) => v.decorations,
+     provide: (plugin) =>
+       EditorView.atomicRanges.of((view) => {
+         return view.plugin(plugin)?.decorations || Decoration.none
+       }),
+   })
+   ```
+
+6. **Add CSS to `theme.ts`** with `cm-hybrid-*` naming + `&dark` override:
+   ```ts
+   '.cm-hybrid-my-feature': { color: '#7c5cfc', ... },
+   '&dark .cm-hybrid-my-feature': { color: '#a78bfa', ... },
+   ```
+
+7. **Add feature flag** to `HybridRenderOptions` interface in `shared.ts`:
+   ```ts
+   /** My feature description. Default: true */
+   myFeature?: boolean
+   ```
+
+8. **Wire into `hybridRender()`** in `index.ts`:
+   ```ts
+   import { myPlugin } from './your-feature'
+   // In the features object:
+   myFeature: opts.myFeature ?? true,
+   // In the extensions array:
+   if (features.myFeature) extensions.push(myPlugin)
+   ```
+
+9. **Add barrel export** in `index.ts` if external code needs your plugin's types/effects.
+
+### Decision Traces — Why Each Key Choice Was Made
+
+Understanding the "why" behind architectural decisions is essential for making good upgrade choices. Changing these without understanding the reasoning will likely reintroduce solved problems.
+
+#### Why `shouldShowSource()` instead of per-plugin cursor checks?
+
+**Problem:** Originally, each plugin independently called `isCursorInRange()` from `shared.ts`. With 17+ plugins, this meant ~34 redundant selection reads per update cycle (17 plugins × 2 calls each for open/close ranges). Worse, some plugins checked cursor on range boundaries while others checked on lines, causing inconsistent behavior — emphasis marks would hide but heading marks would stay visible when the cursor was at the exact same position.
+
+**Solution:** A centralized `shouldShowSource()` function that combines cursor position, drag state (`dragSelectingField`), focus state (`editorFocusField`), and the global Live Preview toggle (`livePreviewEnabled` Facet) into a single boolean answer. All plugins call this one function, ensuring consistent behavior. The pre-computed `cursorPositionField` computes active lines and ranges once per update, reducing the 34 selection reads to 1.
+
+**Do not change this unless:** You have a fundamentally different cursor-awareness model (e.g., proximity-based reveal where decorations within N characters of the cursor partially fade instead of fully showing).
+
+#### Why self-providing atomic ranges instead of centralized `atomic-ranges.ts`?
+
+**Problem:** Most CM6 hybrid renderers use a single `EditorView.atomicRanges` extension that scans all decoration types. This creates tight coupling — every new plugin must register its ranges in the central module, and changes to one plugin's decorations can affect the atomic range computation of another.
+
+**Solution:** Each ViewPlugin provides its own atomic ranges via the `provide` key on `ViewPlugin.fromClass`. The plugin's own `DecorationSet` is mapped directly to atomic ranges. This means plugins are self-contained and can be added/removed independently without touching a central registry. The `atomic-ranges.ts` fallback exists only for the few decoration types that don't self-provide (currently embed images and tags that are caught by regex but not by a ViewPlugin).
+
+**Do not change this unless:** CM6 introduces a new API for atomic ranges that makes the `provide` pattern obsolete.
+
+#### Why dual scanning (Lezer tree-first, regex fallback)?
+
+**Problem:** The Lezer parser for Markdown (`@codemirror/lang-markdown`) recognizes standard Markdown nodes like `Emphasis`, `StrongEmphasis`, `Link`, `Image`, `FencedCode`, etc. But it does NOT recognize Obsidian-specific syntax like `![[embed]]`, `#tag`, `%%comment%%`, `^block-id`, or `~~~ad-note`. Plugins for these syntaxes must use regex. However, regex-only scanning has false positives — a `#tag` inside a code block, or an `![[embed]]` inside inline code.
+
+**Solution:** Plugins first try tree-based scanning. If the tree has the relevant nodes (e.g., `Table`, `Footnote`), they use those. If the tree doesn't have the nodes (either because Lezer doesn't parse them, or because the syntax is invalid), they fall back to regex scanning with `collectSkipRanges()` to exclude code blocks. This gives the accuracy of tree-based parsing where available and the coverage of regex where not.
+
+**Do not change this unless:** A new version of `@codemirror/lang-markdown` or a custom Lezer grammar adds nodes for Obsidian syntax, making regex fallback unnecessary for those features.
+
+#### Why drag suppression as a tri-state?
+
+**Problem:** When the user mouse-drags to select text, each `selectionSet` event triggers a decoration rebuild. Since `shouldShowSource()` returns `true` when the cursor is in range, the rebuild hides the rendered form and shows raw syntax — causing visible flickering during drag. The cursor briefly enters a decorated range, the syntax flashes, the cursor moves, the syntax hides again.
+
+**Solution:** `dragSelectingField` tracks whether a drag is in progress. During drag, `shouldShowSource()` returns `false` (show rendered form), and `checkUpdateAction()` returns `'skip'` (don't rebuild decorations at all). When the drag ends, `checkUpdateAction()` returns `'rebuild'` to catch up. The tri-state is:
+- `'rebuild'` — Doc/viewport changed, or drag just ended, or selection changed (not from drag)
+- `'skip'` — Currently dragging, suppress rebuild to prevent flicker
+- `'none'` — Nothing relevant changed, keep existing decorations
+
+**Do not change this unless:** You're implementing a different selection model (e.g., column selection, remote cursors) that needs different suppression logic.
+
+#### Why singleton widgets and `eq()` methods?
+
+**Problem:** CM6's decoration diffing compares decorations by identity and `eq()`. If a `WidgetType` is created fresh on every rebuild, `eq()` returns `false` by default (referential inequality), and CM6 destroys and recreates the DOM — causing flicker, losing focus, and breaking iOS scroll momentum.
+
+**Solution:** For stateless widgets where all instances with the same parameters look identical (HR, language badges, table badges), we use singleton instances or small caches. The `eq()` method is implemented with structure-only comparison. Example: `HorizontalRuleWidget.eq()` always returns `true` because all HRs look the same. `TableBadgeWidget.eq()` compares `cols` and `rows` only.
+
+**Do not change this unless:** You're adding stateful widgets that genuinely need DOM recreation on each rebuild.
+
+#### Why `focusChangeEffect` as a StateEffect instead of reading `view.hasFocus`?
+
+**Problem:** StateFields (like `displayMathField`, `hrField`, `frontmatterField`) cannot access the `EditorView` — they only receive `EditorState` and `Transaction`. But they need to know if the editor is focused to decide whether to show source (focused) or rendered form (blurred). `state.field(editorFocusField)` works, but someone has to update that field.
+
+**Solution:** `focusMonitorPlugin` (a ViewPlugin, which CAN access `view`) watches `view.hasFocus` and dispatches `focusChangeEffect.of(currentFocus)` on change. The `editorFocusField` StateField reads this effect in its `update()` method. The `setTimeout(0)` wrapper prevents dispatching during an ongoing update cycle.
+
+**Do not change this unless:** CM6 adds a way for StateFields to access view state directly.
+
+### Dependency Graph — Blast Radius of Changes
+
+This shows which files depend on which. The arrow means "is imported by" or "is read by." If you change a file on the left side of an arrow, everything on the right side may be affected.
+
+```
+cursor-awareness.ts ◀── ALL 18 feature plugins call shouldShowSource() or shouldShowSourceForLine()
+                    ◀── atomic-ranges.ts calls shouldShowSource()
+                    ◀── index.ts re-exports livePreviewEnabled, focusChangeEffect, etc.
+
+shared.ts ◀── ALL feature plugins import regex patterns and/or singleton decorations
+           ◀── atomic-ranges.ts imports EMBED_IMAGE_RE, TAG_RE
+
+drag-state.ts ◀── cursor-awareness.ts reads dragSelectingField
+              ◀── ALL ViewPlugins call checkUpdateAction()
+              ◀── math.ts (display), hr.ts, frontmatter.ts call checkFieldAction() which reads dragSelectingField
+
+theme.ts ◀── ALL feature plugins' CSS classes are defined here (indirect — runtime CSS)
+
+index.ts ◀── External consumers import hybridRender() from here
+
+atomic-ranges.ts ◀── index.ts includes it conditionally
+                 ◀── No feature plugins import it (they self-provide)
+```
+
+**Most dangerous file to change:** `cursor-awareness.ts` — every single plugin depends on it. A bug here affects all 18 features simultaneously. The safest changes are additive (new helper functions, new exported APIs). Changing `shouldShowSource()` return semantics requires updating all 18 call sites.
+
+**Safest files to change:** Individual feature plugins — they are self-contained and only affect one syntax type. Changing `callouts.ts` cannot break `tables.ts`.
+
+### Evaluation Framework — How to Assess New CM6 Hybrid Render Solutions
+
+When you find a new repository or npm package that provides CM6 Markdown rendering, run it through this checklist:
+
+| # | Criterion | Why It Matters | How to Check |
+|---|-----------|---------------|--------------|
+| 1 | **Is it decoration-based?** | If it uses ProseMirror or contenteditable, it's a different tier — extract ideas only, not code | Search the source for `Decoration.mark`, `Decoration.widget`, `ViewPlugin`. If you find `Schema`, `NodeType`, `ProseMirror`, `contenteditable` instead, it's Tier 3/4 |
+| 2 | **Does it handle cursor-awareness?** | Central to the hybrid render concept — decorations must hide when cursor approaches | Does it check cursor position before applying decorations? Does it use `shouldShowSource()` or equivalent? |
+| 3 | **Does it handle atomic ranges?** | Without atomic ranges, the cursor enters the middle of hidden text (e.g., inside `**bold**`) and gets stuck | Search for `EditorView.atomicRanges` or `atomicRanges` in the source |
+| 4 | **Does it handle drag suppression?** | Without this, mouse-dragging to select text causes visible flickering | Does it suppress decoration rebuilds during mouse drag? Search for `dragSelect` or pointer event handlers |
+| 5 | **How many Markdown features does it cover?** | NoteCraft has 21 plugins covering 25+ syntax types. Most community solutions cover 3-5 | Count the number of distinct syntax types with dedicated decorations |
+| 6 | **Is it actively maintained?** | Abandoned packages may use deprecated CM6 APIs | Check last commit date, open issues, npm download trends |
+| 7 | **Does it use Lezer tree or regex?** | Tree-based is more accurate; regex is needed for Obsidian syntax not in Lezer grammar | Search for `syntaxTree` (tree) vs raw `RegExp` (regex) usage |
+| 8 | **What's its decoration caching strategy?** | Fresh decorations on every rebuild = flicker. Singleton patterns = smooth | Does it reuse `Decoration` instances? Does `WidgetType.eq()` do structure-only comparison? |
+| 9 | **Does it handle focus state?** | Blurred editor should show rendered form; StateFields need a way to know focus | Does it propagate focus state to StateFields? Search for `focusChange` or `hasFocus` |
+| 10 | **Obsidian compatibility?** | NoteCraft needs Obsidian-specific syntax (embeds, tags, callouts, block refs, comments) | Does it handle any Obsidian syntax? Is there an extension point for it? |
+
+**Scoring guide:**
+- **8-10 checks:** Strong candidate for direct pattern adoption or integration
+- **5-7 checks:** Good for specific technique extraction (e.g., borrow their table algorithm but not their architecture)
+- **Below 5:** Interesting for ideas but architecturally too different; do not attempt integration
+
+### Discovery Strategy — Where to Find New Relevant Repos
+
+#### npm Search Terms
+
+```
+codemirror markdown preview
+codemirror live preview
+codemirror wysiwyg
+codemirror decoration markdown
+codemirror hybrid render
+codemirror rich text markdown
+codemirror obsidian
+```
+
+#### GitHub Search Terms
+
+```
+codemirror decoration markdown
+codemirror live preview
+codemirror-hide-markdown
+codemirror-rich-markdown
+codemirror-markdown-hybrid
+```
+
+#### Specific Repositories and Packages to Monitor
+
+These are the known Tier 1 (decoration-based) solutions. Check them periodically for new techniques:
+
+| Repository / Package | What It Does | What NoteCraft Already Adopted From It |
+|---------------------|-------------|---------------------------------------|
+| [`codemirror-live-markdown`](https://github.com/nicktomlin/codemirror-live-markdown) | Reference Obsidian-style Live Preview | `shouldShowSource()` decision function pattern, drag suppression via `checkUpdateAction()`, singleton widget patterns |
+| [`codemirror-markdown-hybrid`](https://github.com/danielo515/codemirror-markdown-hybrid) | Hybrid rendering with line-level cursor awareness | `focusChangeEffect` pattern for propagating focus to StateFields, line-level active state pre-computation |
+| [`codemirror-rich-markdoc`](https://github.com/markdoc/codemirror-rich-markdoc) | Markdoc-flavored hybrid rendering | Markdoc tag syntax handling (not directly used, but the decoration structure is referenced) |
+| [`@type32/codemirror-rich-obsidian`](https://github.com/nicktomlin/codemirror-rich-obsidian) | Obsidian-flavored CM6 extensions | Table rendering reference, Obsidian-specific syntax handling patterns |
+| [`codemirror-for-writers`](https://github.com/alizain/codemirror-for-writers) | Writer-focused CM6 extensions | Typing-aware emphasis supplements, word-count aware features |
+| [`Atomic Editor`](https://github.com/nicktomlin/atomic-editor) | Full-featured editor with CM6 decorations | WYSIWYG table rendering (column alignment, header styling), `changeAffectsTables()` skip guard, `supplementMidTypingEmphasis()`, image dimension cache, singleton widget patterns |
+
+#### Community Sources
+
+- **Obsidian community plugins** — Obsidian's own editor uses the same CM6 decoration approach internally. Their open-source plugins sometimes reveal new decoration techniques.
+- **CodeMirror discussion forum** — [discuss.codemirror.net](https://discuss.codemirror.net) — Search for "live preview", "hybrid render", "decoration"
+- **Awesome lists** — Search GitHub for `awesome-codemirror`
+- **`@codemirror/view` changelog** — API changes to `Decoration`, `ViewPlugin`, `EditorView.atomicRanges` affect all plugins. Monitor [releases](https://github.com/codemirror/view/releases).
+
+#### Keywords That Indicate Relevance (Same Tier)
+
+These terms in a repository's README or source code suggest it's a Tier 1 decoration-based solution compatible with NoteCraft's approach:
+
+- `Decoration.mark`, `Decoration.widget`, `Decoration.replace`
+- `ViewPlugin.fromClass`
+- `EditorView.atomicRanges`
+- `EditorView.decorations`
+- `shouldShowSource`, `isCursorInRange`
+- `syntaxTree` (from `@codemirror/language`)
+
+#### Keywords That Indicate WRONG Tier
+
+These terms suggest a fundamentally different architecture. The repo may contain useful ideas but its code cannot be directly integrated:
+
+- `ProseMirror`, `Schema`, `NodeType`, `NodeSpec` → Tier 3 (dual-engine)
+- `contenteditable` → Tier 4 (raw contenteditable)
+- `EditorState.create({ doc: ... })` with a ProseMirror schema → Tier 3
+- `Milkdown`, `MDXEditor`, `Gravity UI` → Tier 3 brands
+
+### Community Pattern Source Map
+
+Which community solutions inspired which patterns in NoteCraft, and where to check for upgrades:
+
+| Pattern in NoteCraft | Original Source | Where to Check for Upgrades |
+|---------------------|----------------|----------------------------|
+| WYSIWYG table rendering (alignment, header, skip guard) | Atomic Editor's table rendering | `@type32/codemirror-rich-obsidian`, `codemirror-markdown-tables` |
+| `shouldShowSource()` centralized decision function | codemirror-live-markdown | `codemirror-live-markdown` npm updates |
+| `focusChangeEffect` for StateField focus propagation | codemirror-markdown-hybrid | `codemirror-markdown-hybrid` npm updates |
+| Drag suppression tri-state (`checkUpdateAction`) | codemirror-live-markdown | `codemirror-live-markdown` npm updates |
+| Mid-typing emphasis supplement (`supplementMidTypingEmphasis`) | Atomic Editor | Atomic Editor source |
+| Image dimension cache (iOS scroll momentum fix) | Atomic Editor | Atomic Editor source |
+| Singleton widget patterns (`eq()` structure comparison) | Atomic Editor + codemirror-live-markdown | Both repos |
+| Self-providing atomic ranges via `provide` key | NoteCraft original (no community equivalent) | — |
+| Dual scanning (Lezer tree-first, regex fallback) | NoteCraft original (no community equivalent) | — |
+| Drag suppression tri-state with `checkUpdateAction()` | codemirror-live-markdown (2-state) → NoteCraft (3-state with `'none'`) | codemirror-live-markdown |
+
+### Known Upgrade Vectors
+
+These are specific areas where the hybrid render system could be improved, ranked by expected impact:
+
+| # | Area | Current State | Upgrade Path | Difficulty |
+|---|------|---------------|-------------|------------|
+| 1 | **Table cell editing** | Tables render WYSIWYG visually but cells are not independently editable — you still edit the raw pipe-delimited text | Cell-level widget with inline editing, cursor movement between cells with Tab/Enter | High — requires careful atomic range management and cursor positioning |
+| 2 | **Incremental decoration updates** | Full rebuild on every relevant change — all decorations are recomputed from scratch | Use `RangeSet` diffing to only update changed ranges. Some plugins already do partial optimization (tables: `changeAffectsTables()` skip guard, emphasis: mid-typing supplement only on active lines) | High — requires restructuring each plugin's `build()` function |
+| 3 | **Decoration caching expansion** | Singleton `Decoration.mark()` instances are cached. Widget `eq()` methods do structure comparison. But `Decoration.mark({ class: ... })` calls inside build functions still create per-call objects for non-standard marks | Move all `Decoration.mark()` calls to module-level singletons. Audit every `build*Decorations()` function for inline `Decoration.mark()` creation | Medium — mechanical refactoring, no logic changes |
+| 4 | **Lezer grammar for Obsidian syntax** | Tags, footnotes, comments, block refs, embeds use regex fallback because `@codemirror/lang-markdown` doesn't parse them | Extend the existing Lezer grammar in `lezer-extensions/` to add nodes for these syntaxes, then update plugins to tree-first scanning | High — requires Lezer grammar writing, but removes regex false positives |
+| 5 | **Proximity-based cursor reveal** | Binary: decorations are either fully hidden or fully shown. The `cm-hybrid-active` class adds a subtle background but the transition is instant | Gradual opacity/sizing based on cursor distance. E.g., decorations within 10 characters partially fade, within 5 fully reveal | Medium — CSS `transition` handles animation; the logic change is in `shouldShowSource()` returning a degree instead of boolean |
+| 6 | **Mobile touch drag suppression** | `drag-state.ts` uses `pointerdown`/`pointerup` which works for both mouse and touch. But touch scrolling triggers `selectionSet` events differently | Test on mobile devices; may need `touchstart`/`touchend` handlers with different timing | Low — likely just needs testing and minor adjustments |
+| 7 | **Multi-cursor support** | `shouldShowSource()` checks all selection ranges (supports multi-cursor). But some plugins with `shouldShowSourceForLine()` may not handle multiple active lines correctly | Test with `Ctrl+Alt+Arrow` multi-cursor; audit each plugin for multi-cursor edge cases | Low — the infrastructure supports it, individual plugins may need fixes |
+| 8 | **Link/image preview on hover** | Links show label styling but no URL preview. Images show thumbnails but no size info | Add tooltip widget on hover showing URL, dimensions, or preview | Medium — needs `EditorView.domEventHandlers` for mouseover, tooltip positioning |
+
+### Anti-Patterns — What NOT to Do
+
+These are known patterns that cause bugs, performance issues, or maintenance problems. They have been encountered and fixed during development — do not reintroduce them.
+
+1. **Do NOT use `isCursorInRange()` directly** — It only checks selection overlap. It does NOT handle drag suppression (decorations flicker during mouse drag), focus state (blurred editor should show rendered form), or the Live Preview toggle (Source Mode needs raw syntax always). Always use `shouldShowSource()` or `shouldShowSourceForLine()`.
+
+2. **Do NOT create new `Decoration.mark()` instances inside `build*Decorations()` functions** — CM6's decoration diffing compares `Decoration` objects by identity. Creating `Decoration.mark({ class: 'cm-hybrid-foo' })` inside a function that runs on every rebuild means a new object each time, which makes CM6 destroy and recreate the DOM — causing flicker. Instead, create decoration instances at module level as singletons (like `hiddenMark`, `activeMark` in `shared.ts`) or as static class properties.
+
+3. **Do NOT skip `collectSkipRanges()` in regex-based plugins** — Without this, you'll get false positives: a `#tag` inside a code fence gets a badge decoration, an `![[embed]]` inside inline code gets an embed widget. Always call `collectSkipRanges()` and filter matches with `isInRangeList()`.
+
+4. **Do NOT use `StateField` for inline decorations** — StateFields cannot access `view` (no `view.hasFocus`, no `view.visibleRanges`, no DOM measurements). Use ViewPlugin for inline decorations. Only use StateField for block-level layout-changing decorations (like replacing an entire `---` with an `<hr>` widget).
+
+5. **Do NOT forget `&dark` overrides in `theme.ts`** — Every `cm-hybrid-*` class needs a dark mode counterpart. Without it, decorations that look great in light mode become invisible or jarring in dark mode. The convention is `&dark .cm-hybrid-*` at the bottom of `theme.ts`.
+
+6. **Do NOT add atomic ranges to `atomic-ranges.ts` for new plugins** — The centralized `atomic-ranges.ts` is a legacy fallback. New plugins should self-provide atomic ranges via the `provide` key on `ViewPlugin.fromClass`. This keeps plugins self-contained and makes the feature flag system work correctly (disabling a plugin also disables its atomic ranges).
+
+7. **Do NOT use `WidgetType` without implementing `eq()`** — The default `eq()` uses referential equality (`===`). If you create widgets inside `build*Decorations()`, each rebuild creates new widget instances that are never `===` to the previous ones, so CM6 destroys and recreates the DOM every time. Implement `eq()` with structure-only comparison (compare the fields that determine visual appearance, not object identity).
+
+8. **Do NOT dispatch StateEffects synchronously inside ViewPlugin `update()`** — CM6 does not allow dispatching new transactions during an ongoing update. If a ViewPlugin needs to dispatch an effect (e.g., focus change), use `setTimeout(0)` to defer it. This is the pattern used by `focusMonitorPlugin`.
+
+### Feature Flag Architecture
+
+All 21 features can be individually toggled via the `hybridRender(opts)` factory function. The feature flags are defined in the `HybridRenderOptions` interface in `shared.ts`.
+
+```ts
+import { hybridRender } from '@/lib/codemirror-ext'
+
+// All features enabled (default)
+extensions.push(hybridRender())
+
+// Selective features
+extensions.push(hybridRender({
+  callouts: false,
+  headingMarks: true,
+  tags: true,
+  comments: true,
+  frontmatter: true,
+}))
+
+// Disable Live Preview entirely (Source Mode)
+extensions.push(hybridRender({ livePreview: false }))
+
+// Only syntax marker hiding + heading sizes
+extensions.push(hybridRender({
+  livePreview: true,
+  headingMarks: true,
+  emphasisMarks: true,
+  headingSizes: true,
+  // Everything else defaults to false when you set any flag
+  embedImages: false,
+  images: false,
+  links: false,
+  checkboxes: false,
+  math: false,
+  tags: false,
+  callouts: false,
+  codeBlocks: false,
+  blockquoteMarks: false,
+  horizontalRules: false,
+  inlineCode: false,
+  comments: false,
+  blockRefs: false,
+  embedTransclusions: false,
+  frontmatter: false,
+  admonitions: false,
+  tables: false,
+  footnotes: false,
+}))
+```
+
+The `livePreviewEnabled` Facet is consumed by `shouldShowSource()` — when `false`, it returns `true` (show source) for all ranges, effectively disabling all decorations without removing the plugins from the extension set. This avoids the cost of re-creating extensions when toggling Live Preview on/off.
 
 ---
 
@@ -394,7 +872,32 @@ src/
 │   │   ├── slash/index.ts       # Slash commands
 │   │   ├── image/index.ts       # Image upload with drag-drop-paste
 │   │   ├── inline-suggestion/   # AI ghost text suggestions
-│   │   ├── hybrid-render/       # Obsidian Live Preview decorations
+│   │   ├── hybrid-render/       # 21-plugin CM6 decoration-based hybrid render system
+│   │   │   ├── index.ts           # Orchestrator: hybridRender(opts?) factory + feature flags
+│   │   │   ├── shared.ts          # Regex patterns, singleton Decoration.mark(), skip ranges, HybridRenderOptions
+│   │   │   ├── cursor-awareness.ts # shouldShowSource(), cursorPositionField, livePreviewEnabled Facet
+│   │   │   ├── drag-state.ts      # Drag suppression: dragSelectingField, checkUpdateAction()
+│   │   │   ├── atomic-ranges.ts   # Fallback atomic ranges (most plugins self-provide)
+│   │   │   ├── theme.ts           # ~90 CSS rules, cm-hybrid-* naming, &dark selectors
+│   │   │   ├── heading-marks.ts   # Hide # on headings + heading size styling
+│   │   │   ├── emphasis-marks.ts  # Hide **, *, __, _ delimiters + mid-typing supplement
+│   │   │   ├── embed-images.ts    # ![[embed images]] with thumbnail widgets
+│   │   │   ├── links.ts           # [links](url) and ![images](url) + dimension cache
+│   │   │   ├── checkboxes.ts      # Interactive checkbox widgets
+│   │   │   ├── inline-code.ts     # Inline code background + hide backticks
+│   │   │   ├── tags.ts            # Obsidian #tag badge styling
+│   │   │   ├── callouts.ts        # Callout line decorations > [!note]
+│   │   │   ├── code-blocks.ts     # Fence hiding, language badge widgets
+│   │   │   ├── blockquote-marks.ts # Fade > blockquote markers
+│   │   │   ├── comments.ts        # Hide %%comments%%
+│   │   │   ├── block-refs.ts      # Style ^block-id as clickable badge
+│   │   │   ├── embed-transclusions.ts # ![[note]] transclusion widgets
+│   │   │   ├── admonitions.ts     # ~~~ad-note code-block callouts
+│   │   │   ├── tables.ts          # WYSIWYG table rendering (alignment, header, skip guard)
+│   │   │   ├── footnotes.ts       # Footnote reference/definition styling
+│   │   │   ├── math.ts            # Inline $...$ (ViewPlugin) + display $$...$$ (StateField) + KaTeX
+│   │   │   ├── hr.ts              # Visual horizontal rule widget (singleton, StateField)
+│   │   │   └── frontmatter.ts     # YAML frontmatter collapsed toggle (StateField)
 │   │   ├── slug/index.ts        # Heading slug utilities + panel-based input UI
 │   │   ├── lezer-extensions/    # Obsidian-flavored Markdown Lezer grammar
 │   │   ├── theme/index.ts       # Editor theme
@@ -444,6 +947,17 @@ src/
 - [`yeliex/codemirror-markdown-image`](https://github.com/yeliex/codemirror-markdown-image) — Image upload workflow
 - [`rizerphe/codemirror-companion-extension`](https://github.com/rizerphe/codemirror-companion-extension) — Inline suggestion pattern
 - [`yeliex/codemirror-final-newline`](https://github.com/yeliex/codemirror-final-newline) — Trailing newline
+
+### Hybrid Render Community Sources (Tier 1 — Decoration-Based)
+
+These are the community solutions that inspired NoteCraft's hybrid render system. See the [Hybrid Render System](#hybrid-render-system--architecture--upgrade-guide) section for the full pattern adoption map.
+
+- [`codemirror-live-markdown`](https://github.com/nicktomlin/codemirror-live-markdown) — Reference Obsidian-style Live Preview; source of `shouldShowSource()`, drag suppression, singleton widgets
+- [`codemirror-markdown-hybrid`](https://github.com/danielo515/codemirror-markdown-hybrid) — Line-level cursor awareness; source of `focusChangeEffect` pattern
+- [`codemirror-rich-markdoc`](https://github.com/markdoc/codemirror-rich-markdoc) — Markdoc-flavored hybrid rendering; decoration structure reference
+- [`@type32/codemirror-rich-obsidian`](https://github.com/nicktomlin/codemirror-rich-obsidian) — Obsidian-flavored CM6 extensions; table rendering reference
+- [`codemirror-for-writers`](https://github.com/alizain/codemirror-for-writers) — Writer-focused CM6 extensions; typing-aware emphasis supplements
+- [`Atomic Editor`](https://github.com/nicktomlin/atomic-editor) — Full-featured editor with CM6 decorations; source of WYSIWYG tables, `changeAffectsTables()`, `supplementMidTypingEmphasis()`, image dimension cache
 
 ### Post-Processing & Infrastructure
 
