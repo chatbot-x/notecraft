@@ -7,9 +7,10 @@
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
-    "cf:build": "npx @opennextjs/cloudflare build && bash scripts/prepare-pages.sh",
+    "cf:build": "npx @opennextjs/cloudflare build",
     "cf:dev": "npx wrangler dev",
-    "cf:deploy": "npm run cf:build && npx wrangler pages deploy .open-next"
+    "cf:preview": "npm run cf:build && npx wrangler dev",
+    "cf:deploy": "npm run cf:build && npx wrangler deploy"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
