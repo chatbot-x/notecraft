@@ -1,6 +1,32 @@
 # NoteCraft Worklog
 
 ---
+Task ID: 7
+Agent: Super Z (main)
+Task: Implement all 15 audit items — heading click, toast system, cleanup
+
+Work Log:
+- #1 HIGH: Implemented onHeadingClick — clicking heading in preview jumps to that heading in editor via jumpToHeading() + switches to edit mode
+- #2 HIGH: Fixed stale welcome note TODOs (marked scroll sync + note search as complete)
+- #3 HIGH: Removed unused next-themes dependency from package.json
+- #4 MED: Removed console.log from onHeadingClick (replaced with actual implementation)
+- #5 MED: Fixed invalid Tailwind opacity bg-primary/8 → bg-primary/10
+- #6 MED: Removed undefined dark-preview/light-preview CSS classes
+- #7 MED: Removed unused import insertEmptyMarkdownTable from editor.tsx
+- #8 MED: Wired up toast system — toasts for tag click, embed note creation, code copy
+- #9 MED: Removed dead API route stub (src/app/api/route.ts)
+- #10/#13 MED: Added "test" script to package.json
+- #11 LOW: Replaced DOMPurify require() with dynamic import() for async path
+- #12 LOW: Replaced stale "July 15th" date in welcome note with heading-click tip
+- #14 LOW: Created dev-only logger utility, replaced all production console.warn/error
+- #15 LOW: Fixed TOAST_REMOVE_DELAY from 1000000ms to 5000ms
+
+Stage Summary:
+- All 15 audit items implemented and verified
+- Build passes cleanly
+- Pushed to GitHub as commit eb50d5f
+
+---
 Task ID: 1
 Agent: Super Z (main)
 Task: Merge 6 core markdown-it rules into a single obsidian-transforms pipeline
