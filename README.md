@@ -10,9 +10,10 @@ A privacy-first, Obsidian-flavored markdown note-taking app built with Next.js 1
 
 - **Obsidian-flavored Markdown** — Callouts, embeds, tags, block references, comments, footnotes, math, mermaid diagrams, and more
 - **Live Preview** — Split-pane editing with real-time rendered output (150ms debounced)
+- **Mobile-Ready** — Robust editor with proper keyboard/cursor handling on mobile view mode switches
 - **Hybrid Rendering** — Obsidian-style Live Preview decorations in the editor (checkboxes, embeds, images, math, links)
-- **Obsidian Embeds** — Note transclusions (`![[note]]`), image embed+resize (`![[img.png|300]]`), heading/block embeds (`![[note#^id]]`)
-- **Obsidian Tags** — Inline tags (`#tag`, `#nested/tag`) rendered as clickable badges
+- **Obsidian Embeds** — Note transclusions (`![[note]]`), image embed+resize (`![[img.png|300]]`), heading/block embeds (`![[note#^id]]`); click to navigate or auto-create missing notes
+- **Obsidian Tags** — Inline tags (`#tag`, `#nested/tag`) rendered as clickable badges; click to search notes by tag
 - **Block References** — Define blocks with `^block-id` and reference them from embeds
 - **Front Matter Properties** — YAML front matter rendered as a collapsible properties panel
 - **Code-block Admonitions** — `~~~ad-note` syntax as an alternative to blockquote callouts
@@ -130,7 +131,7 @@ NoteCraft uses **markdown-it** as its rendering engine with a plugin pipeline th
 | 20 | **Syntax Highlighting** | [`shiki`](https://github.com/shikijs/shiki) ^4.2.0 | Async code highlighting, 40 languages, github-light/dark themes |
 | 21 | **XSS Sanitization** | [`dompurify`](https://github.com/cure53/DOMPurify) ^3.4.9 | 120+ allowed tags, 70+ allowed attrs, custom data-attributes |
 | 22 | **Image Zoom** | [`medium-zoom`](https://github.com/francoischalifour/medium-zoom) ^1.1.0 | Click-to-zoom on preview images |
-| 23 | **Event Delegation** | — | Click handlers for tags, embeds, task toggles, heading jumps |
+| 23 | **Event Delegation** | — | Interactive click handlers: tag → search, embed → navigate/create, task toggle, heading jump |
 
 ---
 
@@ -513,8 +514,8 @@ The renderer supports several callbacks for interactive behavior:
 
 | Callback | Trigger | Parameters |
 |----------|---------|------------|
-| `onTagClick` | Tag badge `<a>` clicked | `tagName: string` |
-| `onEmbedClick` | Note embed `<div>` clicked | `source: string, heading?: string, blockId?: string` |
+| `onTagClick` | Tag badge `<a>` clicked | `tagName: string` — opens sidebar, searches `#tagName` |
+| `onEmbedClick` | Note embed `<div>` clicked | `source: string, heading?: string, blockId?: string` — navigates to note or creates it |
 
 ### Custom Toolbar Items
 
