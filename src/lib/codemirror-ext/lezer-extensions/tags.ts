@@ -18,7 +18,7 @@
  *
  * ## Inline Parser Design
  *
- * - Runs `before: "ATXHeading"` to intercept `#` before the heading parser
+ * - Runs `before: "Escape"` to intercept `#` before any other inline parser
  * - Checks preceding context: tag must be preceded by whitespace, line start,
  *   or certain punctuation characters (not alphanumeric)
  * - If the `#` is followed by a space or is at line start + space → let
@@ -86,7 +86,7 @@ const VALID_PRECEDING = new Set([
 
 const tagParser: InlineParser = {
   name: 'Tag',
-  before: 'ATXHeading',
+  before: 'Escape',
 
   parse(cx, next, pos) {
     // Must see #

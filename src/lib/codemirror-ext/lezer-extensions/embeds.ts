@@ -20,7 +20,10 @@
  *
  * ## Inline Parser Design
  *
- * - Runs `before: "Wikilink"` to intercept `![[` before the wikilink parser
+ * - Runs `before: "Link"` to intercept `![[` before the Link parser.
+ *   The Wikilink extension also runs `before: "Link"`, and since Embed
+ *   checks for `!` + `[[` while Wikilink only checks `[[`, the embed
+ *   parser naturally takes precedence when `![[` appears.
  * - On seeing `!` at pos, checks if followed by `[[`
  * - Scans forward to find `]]`
  * - Produces an Embed element with EmbedMark children for `![[` and `]]`
@@ -41,7 +44,7 @@ import { tags } from '@lezer/highlight'
 
 const embedParser: InlineParser = {
   name: 'Embed',
-  before: 'Wikilink',
+  before: 'Link',
 
   parse(cx, next, pos) {
     // Must see ! followed by [[

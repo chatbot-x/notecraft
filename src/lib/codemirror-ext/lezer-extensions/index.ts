@@ -30,8 +30,8 @@
  *
  * ```
  * Comment  → before → Escape        (captures %% before escape)
- * Tag      → before → ATXHeading    (captures #tag before # heading)
- * Embed    → before → Wikilink      (captures ![[ before [[)
+ * Tag      → before → Escape        (captures #tag before # heading; ATXHeading is a block parser, not inline)
+ * Embed    → before → Link          (captures ![[ before [; Wikilink is custom, not a built-in parser)
  * Wikilink → before → Link          (captures [[ before [)
  * Callout  → before → Link          (captures [! before [)
  * BlockRef → after  → Escape        (late, after most inline parsing)
