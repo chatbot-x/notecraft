@@ -18,6 +18,8 @@ interface MarkdownPreviewProps {
   onTagClick?: (tagName: string) => void
   /** Callback when an embed note is clicked */
   onEmbedClick?: (source: string, heading?: string, blockId?: string) => void
+  /** Callback when a wikilink is clicked */
+  onWikilinkClick?: (pageName: string, heading?: string, blockId?: string) => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -30,6 +32,7 @@ export function MarkdownPreview({
   onHeadingClick,
   onTagClick,
   onEmbedClick,
+  onWikilinkClick,
 }: MarkdownPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [renderResult, setRenderResult] = useState<RenderResult>({ html: '', headings: [], frontMatter: null })
@@ -214,6 +217,19 @@ export function MarkdownPreview({
         return
       }
 
+      // ── Wikilink click ─────────────────────────────────────────
+      const wikilink = target.closest('a.obsidian-wikilink') as HTMLAnchorElement | null
+      if (wikilink) {
+        e.preventDefault()
+        const page = wikilink.dataset.wikilinkPage
+        const heading = wikilink.dataset.wikilinkHeading
+        const blockId = wikilink.dataset.wikilinkBlock
+        if (page !== undefined) {
+          onWikilinkClick?.(page || '', heading, blockId)
+        }
+        return
+      }
+
       // ── Embed note click ─────────────────────────────────────────
       const embedNote = target.closest('.embed-note-header') as HTMLElement | null
       if (embedNote) {
@@ -255,7 +271,7 @@ export function MarkdownPreview({
 
     container.addEventListener('click', handleClick)
     return () => container.removeEventListener('click', handleClick)
-  }, [onTaskToggle, onHeadingClick, onTagClick, onEmbedClick])
+  }, [onTaskToggle, onHeadingClick, onTagClick, onEmbedClick, onWikilinkClick])
 
   // ─── Empty State ─────────────────────────────────────────────────────
 

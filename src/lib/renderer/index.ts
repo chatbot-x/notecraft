@@ -95,6 +95,8 @@ export interface RenderOptions {
     tags?: boolean
     /** Obsidian embeds (![[note]], ![[image.png|300]]) */
     embeds?: boolean
+    /** Obsidian wikilinks ([[note]], [[note#heading]], [[note|alias]]) */
+    wikilinks?: boolean
     /** Obsidian block references (^block-id) */
     blockRefs?: boolean
     /** Code-block admonitions (~~~ad-note) */
@@ -278,8 +280,9 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
 
   // ─── Obsidian Transforms (merged core-rule pipeline) ───────────────
   // Single `obsidian_transforms` core rule: one inline walk
-  // (comment → embed → tag sub-passes) then block-level transforms
-  // (callout, block-ref). No ordering dependencies between sub-passes.
+  // (comment → embed → wikilink → tag sub-passes) then block-level transforms
+  // (callout, block-ref). Ordering: embeds before wikilinks (![[...]] consumed first),
+  // wikilinks before tags ([[#heading]] not mis-parsed as tag).
 
   md.use(obsidianTransforms, {
     commentStrip: true,
@@ -287,9 +290,11 @@ function createMarkdownIt(opts: RenderOptions = {}): MarkdownIt {
     tagClass: 'obsidian-tag',
     blockRefIndicatorClass: 'block-ref-id',
     blockRefShowIndicator: true,
+    wikilinkClass: 'obsidian-wikilink',
     features: {
       comments: features.comments !== false,
       embeds: features.embeds !== false,
+      wikilinks: features.wikilinks !== false,
       tags: features.tags !== false,
       callouts: features.callouts !== false,
       blockRefs: features.blockRefs !== false,
@@ -352,6 +357,7 @@ function sanitizeHtml(html: string): string {
       'data-embed-src', 'data-embed-type', 'data-embed-heading', 'data-embed-block',
       'data-embed-placeholder',
       'data-block-id',
+      'data-wikilink-page', 'data-wikilink-heading', 'data-wikilink-block',
     ],
     ADD_TAGS: ['input'],
     // Allow data: URIs for images (base64 uploads)

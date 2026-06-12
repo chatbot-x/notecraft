@@ -7,20 +7,33 @@
  *   Phase 1 — Inline transforms (single walk over inline tokens):
  *     1. Comment stripping  (%%hidden%%)
  *     2. Embed detection     (![[note]], ![[image.png|300]])
- *     3. Tag replacement     (#tag, #nested/tag)
+ *     3. Wikilink detection   ([[note]], [[note#heading]], [[note|alias]])
+ *     4. Tag replacement     (#tag, #nested/tag)
  *
  *   Phase 2 — Block transforms (reverse-order token stream mutation):
- *     4. Callout transformation (> [!note], > [!warning]+, > [!danger]-)
- *     5. Block reference handling (^block-id)
+ *     5. Callout transformation (> [!note], > [!warning]+, > [!danger]-)
+ *     6. Block reference handling (^block-id)
  *
- * No ordering dependencies between inline sub-passes:
- *   - Comments first is just nice-to-have (skip hidden text in later passes)
- *   - Embeds are standalone — parse ![[...]] directly
+ * Ordering constraints for Phase 1:
+ *   - Comments first — nice-to-have (skip hidden text in later passes)
+ *   - Embeds BEFORE wikilinks — ![[...]] must be consumed first so that
+ *     the [[...]] portion isn't also matched as a wikilink
+ *   - Tags after wikilinks — so [[#heading]] isn't mis-parsed as a tag
  *   - Tags don't conflict with embeds or comments
  *
  * Architecture principle:
  *   markdown-it is the engine, remark is the reference implementation.
  *   Each sub-transform is a pure function that could be independently tested.
+ *
+ * Wikilinks were originally handled by the `markdown-it-wikilinks` npm
+ * package. That dependency has been removed — wikilinks are now parsed
+ * natively in this pipeline with full Obsidian compatibility:
+ *   - [[note]]             → basic wikilink
+ *   - [[note#heading]]     → heading reference (data-wikilink-heading)
+ *   - [[note#^blockid]]    → block reference  (data-wikilink-block)
+ *   - [[note|alias]]       → alias display     (alias shown, note as href)
+ *   - [[#heading]]         → same-note heading reference
+ *   - [[#^blockid]]        → same-note block reference
  */
 
 import type MarkdownIt from 'markdown-it'
@@ -41,10 +54,13 @@ export interface ObsidianTransformsOptions {
   blockRefIndicatorClass?: string
   /** Whether to show block reference indicators. Default: true */
   blockRefShowIndicator?: boolean
+  /** CSS class for wikilink anchor elements. Default: "obsidian-wikilink" */
+  wikilinkClass?: string
   /** Feature flags — each can be disabled independently */
   features?: {
     comments?: boolean
     embeds?: boolean
+    wikilinks?: boolean
     tags?: boolean
     callouts?: boolean
     blockRefs?: boolean
@@ -59,6 +75,11 @@ const COMMENT_RE = /%%(.*?)%%/g
 // Embeds: ![[content]] where content can contain #, ^, | but not newlines
 // Captures: group 1 = source (before |), group 2 = size/alias (after |, optional)
 const EMBED_RE = /!\[\[([^\]\n|]+?)(\|[^\]\n|]+?)?\]\]/g
+
+// Wikilinks: [[content]] — must NOT be preceded by !
+// Captures: group 1 = target (before |), group 2 = alias (after |, optional)
+// Supports: [[note]], [[note#heading]], [[note#^blockid]], [[note|alias]], [[#heading]], [[#^blockid]]
+const WIKILINK_RE = /(?<!!)\[\[([^\]\n|]+?)(?:\|([^\]\n]+?))?\]\]/g
 
 // Tags: valid tag starts with letter/underscore
 const TAG_NAME_RE = /^[a-zA-Z_][\w/-]*$/
@@ -88,6 +109,13 @@ const MEDIA_EXTENSIONS = new Set([
 const SIZE_RE = /^(\d+)(?:x(\d+))?$/
 
 // ─── Parsed Types ────────────────────────────────────────────────────────────
+
+interface ParsedWikilink {
+  href: string
+  displayText: string
+  heading?: string
+  blockId?: string
+}
 
 interface ParsedEmbed {
   source: string
@@ -383,7 +411,135 @@ function applyEmbedTransform(
   }
 }
 
-/** Sub-pass 3: Replace #tag patterns with tag anchor tokens */
+/** Sub-pass 3: Replace [[wikilink]] patterns with wikilink anchor tokens */
+function applyWikilinkTransform(
+  inlineToken: Token,
+  state: StateCore,
+  wikilinkClass: string,
+): void {
+  const children = inlineToken.children
+  if (!children) return
+
+  if (!children.some(c => c.type === 'text' && c.content.includes('[['))) return
+
+  const newChildren: Token[] = []
+  let modified = false
+
+  for (const child of children) {
+    if (child.type !== 'text' || !child.content.includes('[[')) {
+      newChildren.push(child)
+      continue
+    }
+
+    // Skip if this text contains an embed prefix (embeds already consumed by sub-pass 2)
+    // But some [[...]] may remain that are NOT preceded by !
+    WIKILINK_RE.lastIndex = 0
+    if (!WIKILINK_RE.test(child.content)) {
+      newChildren.push(child)
+      continue
+    }
+
+    modified = true
+
+    // Reset regex and split
+    WIKILINK_RE.lastIndex = 0
+    const parts = child.content.split(WIKILINK_RE)
+
+    // split with 2 capture groups: parts = [text, target, alias, text, target, alias, ...]
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+
+      if (i % 3 === 0) {
+        // Regular text between wikilinks
+        if (part) {
+          const textToken = new state.Token('text', '', 0)
+          textToken.content = part
+          newChildren.push(textToken)
+        }
+      } else if (i % 3 === 1) {
+        // Target part of wikilink
+        const target = part.trim()
+        const alias = parts[i + 1]?.trim() || undefined
+
+        // Parse target into href, heading, blockId
+        const parsed = parseWikilinkTarget(target, alias)
+
+        // Create wikilink_open token
+        const openToken = new state.Token('wikilink_open', 'a', 1)
+        openToken.attrPush(['class', wikilinkClass])
+        openToken.attrPush(['href', parsed.href])
+        openToken.attrPush(['data-wikilink-page', parsed.href.startsWith('#') ? '' : parsed.href.replace(/#.*$/, '')])
+        if (parsed.heading) openToken.attrPush(['data-wikilink-heading', parsed.heading])
+        if (parsed.blockId) openToken.attrPush(['data-wikilink-block', parsed.blockId])
+        newChildren.push(openToken)
+
+        // Display text
+        const textToken = new state.Token('text', '', 0)
+        textToken.content = parsed.displayText
+        newChildren.push(textToken)
+
+        // wikilink_close token
+        const closeToken = new state.Token('wikilink_close', 'a', -1)
+        newChildren.push(closeToken)
+
+        // Skip the alias part (i+1) since we already processed it
+        i++
+      }
+      // i % 3 === 2 is the alias capture group, handled with i%3===1
+    }
+  }
+
+  if (modified) {
+    inlineToken.children = newChildren
+    rebuildInlineContent(inlineToken)
+  }
+}
+
+/** Parse a wikilink target string into href, display text, heading, and block ID */
+function parseWikilinkTarget(target: string, alias?: string): ParsedWikilink {
+  let path = target
+  let heading: string | undefined
+  let blockId: string | undefined
+
+  // Split on # to separate path from fragment
+  const hashIdx = path.indexOf('#')
+  if (hashIdx !== -1) {
+    const fragment = path.slice(hashIdx + 1)
+    path = path.slice(0, hashIdx)
+    if (fragment.startsWith('^')) {
+      blockId = fragment.slice(1)
+    } else {
+      heading = fragment
+    }
+  }
+
+  // Build href
+  let href: string
+  if (path === '' && (heading || blockId)) {
+    // Same-note reference: [[#heading]] or [[#^blockid]]
+    href = heading ? `#${heading}` : `#^${blockId}`
+  } else {
+    href = path.replace(/\s+/g, '%20')
+    if (heading) href += `#${heading}`
+    if (blockId) href += `#^${blockId}`
+  }
+
+  // Build display text
+  let displayText: string
+  if (alias) {
+    displayText = alias
+  } else if (heading) {
+    displayText = heading
+  } else if (blockId) {
+    displayText = `^${blockId}`
+  } else {
+    displayText = path
+  }
+
+  return { href, displayText, heading, blockId }
+}
+
+/** Sub-pass 4: Replace #tag patterns with tag anchor tokens */
 function applyTagTransform(
   inlineToken: Token,
   state: StateCore,
@@ -719,12 +875,17 @@ function obsidianTransformsRule(opts: Required<ObsidianTransformsOptions>): (sta
         applyCommentTransform(token, state, opts.commentStrip)
       }
 
-      // Sub-pass 2: Replace ![[embeds]] (standalone, no dependency on other transforms)
+      // Sub-pass 2: Replace ![[embeds]] (must run before wikilinks to consume ![[...]])
       if (features.embeds) {
         applyEmbedTransform(token, state, opts.embedBase)
       }
 
-      // Sub-pass 3: Replace #tags
+      // Sub-pass 3: Replace [[wikilinks]] (runs after embeds so ![[...]] is already consumed)
+      if (features.wikilinks) {
+        applyWikilinkTransform(token, state, opts.wikilinkClass)
+      }
+
+      // Sub-pass 4: Replace #tags (runs after wikilinks so [[#heading]] isn't mis-parsed)
       if (features.tags) {
         applyTagTransform(token, state, opts.tagClass)
       }
@@ -744,6 +905,14 @@ function obsidianTransformsRule(opts: Required<ObsidianTransformsOptions>): (sta
 // ─── Renderer Registration ───────────────────────────────────────────────────
 
 function registerObsidianRenderers(md: MarkdownIt): void {
+  // Wikilink token renderers
+  md.renderer.rules['wikilink_open'] = function (tokens, idx, options, _env, self) {
+    return self.renderToken(tokens, idx, options)
+  }
+  md.renderer.rules['wikilink_close'] = function (tokens, idx, options, _env, self) {
+    return self.renderToken(tokens, idx, options)
+  }
+
   // Tag token renderers
   md.renderer.rules['tag_open'] = function (tokens, idx, options, _env, self) {
     return self.renderToken(tokens, idx, options)
@@ -787,9 +956,11 @@ export default function obsidianTransformsPlugin(md: MarkdownIt, opts: ObsidianT
     tagClass: opts.tagClass ?? 'obsidian-tag',
     blockRefIndicatorClass: opts.blockRefIndicatorClass ?? 'block-ref-id',
     blockRefShowIndicator: opts.blockRefShowIndicator ?? true,
+    wikilinkClass: opts.wikilinkClass ?? 'obsidian-wikilink',
     features: {
       comments: features.comments ?? true,
       embeds: features.embeds ?? true,
+      wikilinks: features.wikilinks ?? true,
       tags: features.tags ?? true,
       callouts: features.callouts ?? true,
       blockRefs: features.blockRefs ?? true,
