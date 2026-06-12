@@ -24,6 +24,8 @@
  * - `block-refs.ts`       — Style ^block-id as clickable badge
  * - `embed-transclusions.ts` — ![[note]] transclusion widgets
  * - `admonitions.ts`      — ~~~ad-note code-block callouts
+ * - `tables.ts`           — WYSIWYG table rendering (hide pipes, style cells)
+ * - `footnotes.ts`        — Footnote reference/definition styling
  *
  * ### Block Features (StateField — required for layout-changing decorations)
  * - `hr.ts`               — Visual horizontal rule widget (block replace)
@@ -34,6 +36,7 @@
  * - `shared.ts`           — Cursor checks, regex patterns, reusable decorations
  * - `atomic-ranges.ts`    — Fallback atomic ranges for decorations
  * - `drag-state.ts`       — Mouse-drag suppression to prevent flicker
+ * - `cursor-awareness.ts` — Centralized cursor position tracking (performance)
  * - `theme.ts`            — Unified theme with dark mode overrides
  *
  * ## Feature Flags
@@ -76,6 +79,8 @@ import { commentsPlugin } from './comments'
 import { blockRefsPlugin } from './block-refs'
 import { embedTransclusionsPlugin } from './embed-transclusions'
 import { admonitionsPlugin } from './admonitions'
+import { tablesPlugin } from './tables'
+import { footnotesPlugin } from './footnotes'
 
 // Feature plugins — StateField-based (block-level decorations)
 import { hrField } from './hr'
@@ -85,6 +90,7 @@ import { frontmatterPlugin } from './frontmatter'
 // Cross-cutting concerns
 import { atomicRangesExt } from './atomic-ranges'
 import { dragSelectingField, dragSelectHandlers } from './drag-state'
+import { cursorPositionField } from './cursor-awareness'
 import { hybridRenderTheme } from './theme'
 
 // Re-export the options type for convenience
@@ -139,12 +145,19 @@ export function hybridRender(opts: HybridRenderOptions = {}): Extension {
     frontmatter: opts.frontmatter ?? true,
     admonitions: opts.admonitions ?? true,
     headingSizes: opts.headingSizes ?? true,
+
+    // Level 2 new features (community-inspired)
+    tables: opts.tables ?? true,
+    footnotes: opts.footnotes ?? true,
   }
 
   const extensions: Extension[] = [hybridRenderTheme]
 
   // ── Drag suppression (always included) ──────────────────────────────────
   extensions.push(dragSelectingField, dragSelectHandlers)
+
+  // ── Centralized cursor awareness (performance optimization) ────────────
+  extensions.push(cursorPositionField)
 
   // ── Core features (always recommended) ──────────────────────────────────
   if (features.checkboxes) extensions.push(checkboxesPlugin)
@@ -175,6 +188,10 @@ export function hybridRender(opts: HybridRenderOptions = {}): Extension {
   if (features.codeBlocks) extensions.push(codeBlocksPlugin)
   if (features.inlineCode) extensions.push(inlineCodePlugin)
   if (features.admonitions) extensions.push(admonitionsPlugin)
+
+  // ── Community-inspired features ────────────────────────────────────────
+  if (features.tables) extensions.push(tablesPlugin)
+  if (features.footnotes) extensions.push(footnotesPlugin)
 
   // ── Fallback atomic ranges ──────────────────────────────────────────────
   // Most plugins now self-provide atomic ranges via the `provide` pattern.

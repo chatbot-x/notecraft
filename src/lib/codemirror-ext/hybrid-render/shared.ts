@@ -291,4 +291,8 @@ export interface HybridRenderOptions {
   admonitions?: boolean
   /** Apply heading size styling (H1-H6 font sizes). Default: true */
   headingSizes?: boolean
+  /** WYSIWYG table rendering (hide pipes, style cells). Default: true */
+  tables?: boolean
+  /** Footnote reference/definition styling. Default: true */
+  footnotes?: boolean
 }

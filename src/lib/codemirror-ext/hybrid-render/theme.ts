@@ -483,6 +483,80 @@ export const hybridRenderTheme = EditorView.baseTheme({
     // Additional class on top of cm-hybrid-callout for code-block admonitions
   },
 
+  // ─── WYSIWYG Table ──────────────────────────────────────────────────────
+  '.cm-hybrid-table': {
+    // Container line decoration for table first line
+  },
+  '.cm-hybrid-table-row': {
+    // Row-level line decoration
+    padding: '0 2px',
+  },
+  '.cm-hybrid-table-separator': {
+    // Visual pipe separator between cells
+    opacity: '0.15',
+    fontSize: '0',
+    display: 'inline-block',
+    width: '8px',
+    overflow: 'hidden',
+    position: 'relative',
+    pointerEvents: 'none',
+    borderLeft: '1px solid rgba(0, 0, 0, 0.15)',
+    verticalAlign: 'middle',
+  },
+  '.cm-hybrid-table-badge': {
+    display: 'inline-block',
+    fontSize: '0.65em',
+    lineHeight: '1',
+    padding: '1px 4px',
+    borderRadius: '2px',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    color: '#888',
+    verticalAlign: 'middle',
+    marginRight: '4px',
+    fontFamily: 'var(--font-geist-mono), monospace',
+    fontWeight: '400',
+  },
+
+  // ─── Footnotes ──────────────────────────────────────────────────────────
+  '.cm-hybrid-footnote-ref': {
+    color: '#7c5cfc',
+    fontSize: '0.8em',
+    verticalAlign: 'super',
+    cursor: 'pointer',
+    fontWeight: '500',
+    lineHeight: '1',
+  },
+  '.cm-hybrid-footnote-inline-bracket': {
+    fontSize: '0',
+    lineHeight: '0',
+    display: 'inline-block',
+    width: '0',
+    overflow: 'hidden',
+    position: 'absolute',
+    pointerEvents: 'none',
+  },
+  '.cm-hybrid-footnote-inline-content': {
+    color: '#7c5cfc',
+    fontSize: '0.85em',
+    verticalAlign: 'super',
+    cursor: 'pointer',
+    backgroundColor: 'rgba(124, 92, 252, 0.06)',
+    borderRadius: '2px',
+    padding: '0 2px',
+  },
+  '.cm-hybrid-footnote-def-line': {
+    // Line decoration for footnote definition lines
+    paddingLeft: '8px',
+    borderLeft: '2px solid rgba(124, 92, 252, 0.2)',
+    marginLeft: '-4px',
+  },
+  '.cm-hybrid-footnote-def-prefix': {
+    color: '#7c5cfc',
+    fontSize: '0.85em',
+    fontWeight: '500',
+    opacity: '0.7',
+  },
+
   // ────────────────────────────────────────────────────────────────────────
   // ─── Dark Mode Overrides ───────────────────────────────────────────────
   // ────────────────────────────────────────────────────────────────────────
@@ -599,5 +673,29 @@ export const hybridRenderTheme = EditorView.baseTheme({
   },
   '&dark .cm-hybrid-frontmatter-expanded': {
     color: '#888',
+  },
+
+  // ─── Dark mode: tables ─────────────────────────────────────────────────
+  '&dark .cm-hybrid-table-separator': {
+    borderLeftColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  '&dark .cm-hybrid-table-badge': {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    color: '#aaa',
+  },
+
+  // ─── Dark mode: footnotes ──────────────────────────────────────────────
+  '&dark .cm-hybrid-footnote-ref': {
+    color: '#a78bfa',
+  },
+  '&dark .cm-hybrid-footnote-inline-content': {
+    color: '#a78bfa',
+    backgroundColor: 'rgba(167, 139, 250, 0.1)',
+  },
+  '&dark .cm-hybrid-footnote-def-line': {
+    borderLeftColor: 'rgba(167, 139, 250, 0.25)',
+  },
+  '&dark .cm-hybrid-footnote-def-prefix': {
+    color: '#a78bfa',
   },
 })
