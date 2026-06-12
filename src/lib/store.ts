@@ -77,7 +77,7 @@ Your Obsidian-level markdown note-taking app, powered by **CodeMirror 6** and **
 
 - **Bold**, *italic*, ~~strikethrough~~, and ==highlighted== text
 - H~2~O (subscript) and E=mc^2^ (superscript)
-- Embeds for inter-note linking
+- Embeds for inter-note linking with live content resolution
 - Task lists with interactive checkboxes
 - Footnotes[^1]
 - Custom attributes {.text-red}
@@ -127,7 +127,7 @@ graph LR
 > [!note] Note
 > This is a note callout — great for highlighting important information.
 
-> [!important] Important
+> [!important] Heading Navigation
 > Click any heading in preview mode to jump straight to it in the editor.
 
 > [!tip] Tip
@@ -160,7 +160,13 @@ This text is visible. %%This text is hidden in the preview%% And this is also vi
 - [x] Build custom extension plugin
 - [x] Implement markdown-it rendering engine
 - [x] Add emoji, definition lists, front matter, foldable callouts
+- [x] Add scroll sync between editor and preview (split view)
 - [x] Add note search within content
+- [x] Heading click navigation (preview → editor)
+- [x] Dark mode persistence across sessions
+- [x] Error boundary for crash recovery
+- [x] Inline AI suggestion extension wired
+- [x] XSS hardening (iframe removed from allowlist)
 
 ## Tables
 
@@ -176,6 +182,7 @@ This text is visible. %%This text is hidden in the preview%% And this is also vi
 | Front Matter | markdown-it-front-matter | Active |
 | Comments | Custom Plugin | Active |
 | Foldable Callouts | Custom Plugin | Active |
+| Scroll Sync | Percentage-based | Active |
 
 ---
 
