@@ -1,5 +1,5 @@
 /**
- * Embed transclusions decoration plugin — Enhanced Edition.
+ * Embed transclusion decoration plugin — Enhanced Edition.
  *
  * Handles Obsidian-style non-image embeds:
  * - ![[note]] / ![[note#heading]] / ![[note#^block-id]] / ![[#heading]]
@@ -7,17 +7,20 @@
  * ## Enhancement
  *
  * Uses `shouldShowSource()` for consistent cursor-awareness.
+ *
+ * ## v3: StateField migration
+ *
+ * Converted from ViewPlugin to StateField to support `block: true` decorations,
+ * which are no longer allowed in ViewPlugin as of @codemirror/view 6.43+.
  */
 
 import {
   Decoration,
   type DecorationSet,
   EditorView,
-  ViewPlugin,
   WidgetType,
-  type ViewUpdate,
 } from '@codemirror/view'
-import type { Range } from '@codemirror/state'
+import { StateField, type Range, type Transaction } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import {
   isImagePath,
@@ -26,7 +29,7 @@ import {
   isInRangeList,
 } from './shared'
 import { shouldShowSource } from './cursor-awareness'
-import { checkUpdateAction } from './drag-state'
+import { dragSelectingField } from './drag-state'
 
 // ─── Widget: Embed Transclusion ───────────────────────────────────────────────
 
@@ -122,119 +125,129 @@ function parseEmbedTarget(target: string): EmbedTarget {
 
 // ─── Build Decorations ───────────────────────────────────────────────────────
 
-function buildEmbedTransclusionDecorations(view: EditorView): DecorationSet {
+function buildEmbedTransclusionDecorations(state: import('@codemirror/state').EditorState): DecorationSet {
   const ranges: Range<Decoration>[] = []
-  const state = view.state
+  const doc = state.doc
 
   // Try tree-based scanning first
   const tree = syntaxTree(state)
   let usedTree = false
 
-  for (const { from, to } of view.visibleRanges) {
-    tree.iterate({
-      from,
-      to,
-      enter(node) {
-        if (node.name === 'Embed') {
-          let targetText = ''
-          node.node.cursor().iterate((child) => {
-            if (child.name === 'EmbedTarget') {
-              targetText = state.doc.sliceString(child.from, child.to)
-            }
-            return false
-          })
-
-          const pipeIdx = targetText.indexOf('|')
-          const filePath = pipeIdx > -1 ? targetText.slice(0, pipeIdx) : targetText
-          const label = pipeIdx > -1 ? targetText.slice(pipeIdx + 1) : undefined
-
-          if (isImagePath(filePath)) return
-
-          usedTree = true
-          const start = node.from
-          const end = node.to
-
-          if (shouldShowSource(state, start, end)) {
-            ranges.push(
-              Decoration.mark({
-                class: 'cm-hybrid-active',
-              }).range(start, end)
-            )
-            return
+  tree.iterate({
+    enter(node) {
+      if (node.name === 'Embed') {
+        let targetText = ''
+        node.node.cursor().iterate((child) => {
+          if (child.name === 'EmbedTarget') {
+            targetText = state.doc.sliceString(child.from, child.to)
           }
+          return false
+        })
 
+        const pipeIdx = targetText.indexOf('|')
+        const filePath = pipeIdx > -1 ? targetText.slice(0, pipeIdx) : targetText
+        const label = pipeIdx > -1 ? targetText.slice(pipeIdx + 1) : undefined
+
+        if (isImagePath(filePath)) return
+
+        usedTree = true
+        const start = node.from
+        const end = node.to
+
+        if (shouldShowSource(state, start, end)) {
           ranges.push(
-            Decoration.replace({
-              widget: new EmbedTransclusionWidget(filePath, label),
-              block: true,
+            Decoration.mark({
+              class: 'cm-hybrid-active',
             }).range(start, end)
           )
+          return
         }
-      },
-    })
-  }
+
+        ranges.push(
+          Decoration.replace({
+            widget: new EmbedTransclusionWidget(filePath, label),
+            block: true,
+          }).range(start, end)
+        )
+      }
+    },
+  })
 
   if (usedTree) return Decoration.set(ranges, true)
 
   // ── Fallback: regex scanning ────────────────────────────────────────────
-  const doc = state.doc
-  for (const { from, to } of view.visibleRanges) {
-    const skipRanges = collectSkipRanges(state, from, to)
-    const visibleText = doc.sliceString(from, to)
+  const skipRanges = collectSkipRanges(state, 0, doc.length)
+  const fullText = doc.toString()
 
-    EMBED_TRANSCLUDE_RE.lastIndex = 0
-    let match: RegExpExecArray | null
+  EMBED_TRANSCLUDE_RE.lastIndex = 0
+  let match: RegExpExecArray | null
 
-    while ((match = EMBED_TRANSCLUDE_RE.exec(visibleText)) !== null) {
-      const start = from + match.index
-      const end = start + match[0].length
-      const target = match[1]
-      const label = match[2]
+  while ((match = EMBED_TRANSCLUDE_RE.exec(fullText)) !== null) {
+    const start = match.index
+    const end = start + match[0].length
+    const target = match[1]
+    const label = match[2]
 
-      if (isInRangeList(start, end, skipRanges)) continue
-      if (isImagePath(target)) continue
+    if (isInRangeList(start, end, skipRanges)) continue
+    if (isImagePath(target)) continue
 
-      if (shouldShowSource(state, start, end)) {
-        ranges.push(
-          Decoration.mark({
-            class: 'cm-hybrid-active',
-          }).range(start, end)
-        )
-        continue
-      }
-
+    if (shouldShowSource(state, start, end)) {
       ranges.push(
-        Decoration.replace({
-          widget: new EmbedTransclusionWidget(target, label),
-          block: true,
+        Decoration.mark({
+          class: 'cm-hybrid-active',
         }).range(start, end)
       )
+      continue
     }
+
+    ranges.push(
+      Decoration.replace({
+        widget: new EmbedTransclusionWidget(target, label),
+        block: true,
+      }).range(start, end)
+    )
   }
 
   return Decoration.set(ranges, true)
 }
 
-export const embedTransclusionsPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
+// ─── StateField ───────────────────────────────────────────────────────────────
 
-    constructor(view: EditorView) {
-      this.decorations = buildEmbedTransclusionDecorations(view)
-    }
+function checkFieldAction(tr: Transaction): 'rebuild' | 'skip' | 'none' {
+  if (tr.docChanged) return 'rebuild'
 
-    update(update: ViewUpdate) {
-      const action = checkUpdateAction(update)
-      if (action === 'rebuild') {
-        this.decorations = buildEmbedTransclusionDecorations(update.view)
-      }
-    }
+  const isDragging = tr.state.field(dragSelectingField, false)
+  const wasDragging = tr.startState.field(dragSelectingField, false)
+
+  if (isDragging && wasDragging) return 'skip'
+  if (wasDragging && !isDragging) return 'rebuild'
+  if (isDragging) return 'rebuild'
+
+  if (tr.selection) return 'rebuild'
+
+  return 'none'
+}
+
+export const embedTransclusionsField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildEmbedTransclusionDecorations(state)
   },
-  {
-    decorations: (v) => v.decorations,
-    provide: (plugin) =>
-      EditorView.atomicRanges.of((view) => {
-        return view.plugin(plugin)?.decorations || Decoration.none
-      }),
-  }
-)
+  update(deco, tr) {
+    const action = checkFieldAction(tr)
+    if (action === 'rebuild') {
+      return buildEmbedTransclusionDecorations(tr.state)
+    }
+    if (tr.docChanged) {
+      return deco.map(tr.changes)
+    }
+    return deco
+  },
+  provide: f => EditorView.decorations.from(f),
+})
+
+// Provide atomic ranges for embed transclusions
+export const embedTransclusionsAtomicRanges = EditorView.atomicRanges.of((view) => {
+  return view.state.field(embedTransclusionsField, false) || Decoration.none
+})
+
+export const embedTransclusionsPlugin = [embedTransclusionsField, embedTransclusionsAtomicRanges] as const

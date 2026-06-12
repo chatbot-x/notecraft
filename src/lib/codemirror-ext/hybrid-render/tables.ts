@@ -30,21 +30,24 @@
  * 3. Adds cell-level styling (borders, padding, alignment)
  * 4. Shows a table badge indicator with column/row count
  * 5. Distinguishes header rows from body rows
+ *
+ * ## v3: StateField migration
+ *
+ * Converted from ViewPlugin to StateField to support `block: true` decorations,
+ * which are no longer allowed in ViewPlugin as of @codemirror/view 6.43+.
  */
 
 import {
   Decoration,
   type DecorationSet,
   EditorView,
-  ViewPlugin,
   WidgetType,
-  type ViewUpdate,
 } from '@codemirror/view'
+import { StateField, type Range, type Transaction } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
-import type { Range } from '@codemirror/state'
 import { hiddenMark } from './shared'
 import { shouldShowSource, shouldShowSourceForLine } from './cursor-awareness'
-import { checkUpdateAction } from './drag-state'
+import { dragSelectingField } from './drag-state'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -155,52 +158,6 @@ function parseAlignments(separatorLine: string): ColumnAlign[] {
   return alignments
 }
 
-// ─── Skip Guard: changeAffectsTables ─────────────────────────────────────────
-
-/**
- * Cheap pre-check that determines whether a document change could possibly
- * affect any table decorations. If not, we skip the full O(doc) scan and
- * just map existing decorations through the change.
- *
- * This pattern is from Atomic Editor's `changeAffectsTables()` function.
- * It reduces per-keystroke cost from O(doc) to O(change) for the common
- * case of editing text outside tables.
- */
-function changeAffectsTables(update: ViewUpdate, existing: DecorationSet): boolean {
-  if (!update.docChanged) return false
-
-  let affected = false
-
-  // Check 1: Does any change overlap with an existing table decoration?
-  update.changes.iterChanges((fromA, toA, _fromB, _toB, _inserted) => {
-    if (affected) return
-    existing.between(fromA, toA, () => {
-      affected = true
-      return false // Stop iteration
-    })
-  })
-  if (affected) return true
-
-  // Check 2: Does any changed line contain a pipe character?
-  // This catches newly-created tables that don't have decorations yet.
-  const doc = update.state.doc
-  update.changes.iterChanges((fromA, toA, _fromB, _toB, _inserted) => {
-    if (affected) return
-    // Check the changed range and surrounding lines for pipe characters
-    const startLine = doc.lineAt(Math.max(0, fromA)).number
-    const endLine = doc.lineAt(Math.min(doc.length, toA)).number
-    for (let n = startLine; n <= endLine; n++) {
-      const line = doc.line(n)
-      if (line.text.includes('|')) {
-        affected = true
-        return
-      }
-    }
-  })
-
-  return affected
-}
-
 // ─── Regex Fallback Table Detection ─────────────────────────────────────────
 
 /**
@@ -277,48 +234,41 @@ import type { EditorState } from '@codemirror/state'
 
 // ─── Build Decorations ──────────────────────────────────────────────────────
 
-function buildTableDecorations(view: EditorView): DecorationSet {
+function buildTableDecorations(state: EditorState): DecorationSet {
   const ranges: Range<Decoration>[] = []
-  const state = view.state
   const doc = state.doc
 
   // Try tree-based scanning first
   const tree = syntaxTree(state)
   let usedTree = false
 
-  for (const { from, to } of view.visibleRanges) {
-    tree.iterate({
-      from,
-      to,
-      enter(node) {
-        if (node.name === 'Table') {
-          usedTree = true
-          const tableFrom = node.from
-          const tableTo = node.to
+  tree.iterate({
+    enter(node) {
+      if (node.name === 'Table') {
+        usedTree = true
+        const tableFrom = node.from
+        const tableTo = node.to
 
-          // Use centralized shouldShowSource
-          if (shouldShowSource(state, tableFrom, tableTo)) return
+        // Use centralized shouldShowSource
+        if (shouldShowSource(state, tableFrom, tableTo)) return
 
-          // Apply table decorations with alignment detection
-          applyTableDecorations(ranges, state, doc, tableFrom, tableTo)
-        }
-      },
-    })
-  }
+        // Apply table decorations with alignment detection
+        applyTableDecorations(ranges, state, doc, tableFrom, tableTo)
+      }
+    },
+  })
 
   // If tree had Table nodes, we're done
   if (usedTree && ranges.length > 0) return Decoration.set(ranges, true)
 
   // ── Fallback: regex scanning ────────────────────────────────────────────
-  for (const { from, to } of view.visibleRanges) {
-    const detectedTables = detectTablesRegex(state, from, to)
+  const detectedTables = detectTablesRegex(state, 0, doc.length)
 
-    for (const table of detectedTables) {
-      // Use centralized shouldShowSource
-      if (shouldShowSource(state, table.from, table.to)) continue
+  for (const table of detectedTables) {
+    // Use centralized shouldShowSource
+    if (shouldShowSource(state, table.from, table.to)) continue
 
-      applyTableDecorationsWithInfo(ranges, state, doc, table)
-    }
+    applyTableDecorationsWithInfo(ranges, state, doc, table)
   }
 
   return Decoration.set(ranges, true)
@@ -351,8 +301,8 @@ function applyTableDecorations(
       // Parse alignments from separator line (key enhancement)
       alignments = parseAlignments(lineText)
 
-      // Use block: true + line.to (without +1) to avoid crossing line breaks.
-      // CM6 forbids non-block Decoration.replace() that spans line breaks in ViewPlugins.
+      // block: true is allowed in StateField-provided decorations.
+      // Using line.to (without +1) to avoid crossing line breaks.
       ranges.push(
         Decoration.replace({
           widget: getTableBadge(colCount || 1, 0),
@@ -476,8 +426,8 @@ function applyTableDecorationsWithInfo(
 
     // ── Separator line: hide entirely ────────────────────────────────
     if (TABLE_SEPARATOR_RE.test(lineText)) {
-      // Use block: true + line.to (without +1) to avoid crossing line breaks.
-      // CM6 forbids non-block Decoration.replace() that spans line breaks in ViewPlugins.
+      // block: true is allowed in StateField-provided decorations.
+      // Using line.to (without +1) to avoid crossing line breaks.
       ranges.push(
         Decoration.replace({
           widget: getTableBadge(table.colCount, table.rowCount - 1),
@@ -571,40 +521,44 @@ function applyTableDecorationsWithInfo(
   )
 }
 
-// ─── Plugin Definition ──────────────────────────────────────────────────────
+// ─── StateField ───────────────────────────────────────────────────────────────
 
-export const tablesPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
+function checkFieldAction(tr: Transaction): 'rebuild' | 'skip' | 'none' {
+  if (tr.docChanged) return 'rebuild'
 
-    constructor(view: EditorView) {
-      this.decorations = buildTableDecorations(view)
-    }
+  const isDragging = tr.state.field(dragSelectingField, false)
+  const wasDragging = tr.startState.field(dragSelectingField, false)
 
-    update(update: ViewUpdate) {
-      const action = checkUpdateAction(update)
+  if (isDragging && wasDragging) return 'skip'
+  if (wasDragging && !isDragging) return 'rebuild'
+  if (isDragging) return 'rebuild'
 
-      if (action === 'rebuild') {
-        // Use the skip guard: only rebuild if changes affect tables
-        if (update.docChanged && !changeAffectsTables(update, this.decorations)) {
-          // Changes don't affect tables — just map existing decorations
-          this.decorations = this.decorations.map(update.changes)
-          return
-        }
-        this.decorations = buildTableDecorations(update.view)
-      } else if (action === 'none' && update.docChanged) {
-        // Even on 'none' action, map decorations through changes
-        this.decorations = this.decorations.map(update.changes)
-      }
-    }
+  if (tr.selection) return 'rebuild'
+
+  return 'none'
+}
+
+export const tablesField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildTableDecorations(state)
   },
-  {
-    decorations: (v) => v.decorations,
-    // Provide atomic ranges so cursor treats table cells as single units
-    // when the cursor is outside the table
-    provide: (plugin) =>
-      EditorView.atomicRanges.of((view) => {
-        return view.plugin(plugin)?.decorations || Decoration.none
-      }),
-  }
-)
+  update(deco, tr) {
+    const action = checkFieldAction(tr)
+    if (action === 'rebuild') {
+      return buildTableDecorations(tr.state)
+    }
+    if (tr.docChanged) {
+      return deco.map(tr.changes)
+    }
+    return deco
+  },
+  provide: f => EditorView.decorations.from(f),
+})
+
+// Provide atomic ranges so cursor treats table cells as single units
+// when the cursor is outside the table
+export const tablesAtomicRanges = EditorView.atomicRanges.of((view) => {
+  return view.state.field(tablesField, false) || Decoration.none
+})
+
+export const tablesPlugin = [tablesField, tablesAtomicRanges] as const
