@@ -76,7 +76,7 @@ Your Obsidian-level markdown note-taking app, powered by **CodeMirror 6** and **
 
 - **Bold**, *italic*, ~~strikethrough~~, and ==highlighted== text
 - H~2~O (subscript) and E=mc^2^ (superscript)
-- [[Wikilinks]] for inter-note linking
+- Embeds for inter-note linking
 - Task lists with interactive checkboxes
 - Footnotes[^1]
 - Custom attributes {.text-red}
@@ -170,7 +170,7 @@ This text is visible. %%This text is hidden in the preview%% And this is also vi
 | Math Rendering | KaTeX | Active |
 | Diagrams | Mermaid | Active |
 | Callouts | Custom Plugin | Active |
-| Wikilinks | Custom Plugin | Active |
+| Embeds | Custom Plugin | Active |
 | Emoji | markdown-it-emoji | Active |
 | Def Lists | markdown-it-deflist | Active |
 | Front Matter | markdown-it-front-matter | Active |

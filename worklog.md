@@ -176,3 +176,31 @@ Stage Summary:
 - 25 lines of dead wikilink CSS removed from globals.css
 - README fully updated (23 plugins, no wikilink mentions)
 - Build passes cleanly
+
+---
+Task ID: 6
+Agent: Super Z (main)
+Task: Implement embed/tag click handlers + fix mobile editor bug
+
+Work Log:
+- Implemented embed click handler in note-app.tsx:
+  - Clicking a ![[note]] embed finds the matching note by title (case-insensitive) and navigates to it
+  - If no matching note exists, creates a new note with the embed source as title and switches to edit mode
+  - If the embed has a heading reference, the new note starts with that heading
+- Implemented tag click handler in note-app.tsx:
+  - Clicking a #tag opens the sidebar and sets the search query to `#tagName`
+  - The existing getFilteredNotes() function matches against note content, which naturally finds notes containing that tag
+- Fixed mobile editor bug (keyboard/cursor broken after preview → edit switch):
+  - Root cause: Editor was conditionally rendered with `{(viewMode === 'edit') && <Editor/>}`, causing the CodeMirror EditorView to be destroyed when switching to preview and recreated when switching back. On mobile, the new EditorView doesn't properly re-acquire the virtual keyboard connection.
+  - Fix 1: Changed from conditional rendering to CSS-based hiding. Editor and preview are now always mounted, using `opacity-0 pointer-events-none absolute h-0 w-0` instead of conditional rendering. This keeps the EditorView alive across view mode switches.
+  - Fix 2: Added `onEditorViewChange` callback prop to CodeMirrorEditor so the parent can hold a ref to the EditorView.
+  - Fix 3: Added a `useEffect` in note-app.tsx that calls `view.focus()` when switching to edit mode, with a 50ms delay for layout settling.
+  - Fix 4: Added IntersectionObserver in editor.tsx as a belt-and-suspenders approach — when the editor element transitions from invisible to visible, it auto-focuses.
+- Cleaned up welcome note content: replaced "[[Wikilinks]]" with "Embeds" and "Wikilinks | Custom Plugin" with "Embeds | Custom Plugin"
+- Build passes cleanly
+
+Stage Summary:
+- Embed click handler: navigate to note or create new note
+- Tag click handler: search sidebar by tag
+- Mobile editor bug fixed with three-pronged approach (CSS hiding + focus restoration + IntersectionObserver)
+- Welcome note cleaned up

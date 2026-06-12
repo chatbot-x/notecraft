@@ -67,9 +67,11 @@ export function NoteApp() {
   const setViewMode = useNotesStore((s) => s.setViewMode)
   const setFontSize = useNotesStore((s) => s.setFontSize)
   const setCommandPaletteOpen = useNotesStore((s) => s.setCommandPaletteOpen)
+  const setSearchQuery = useNotesStore((s) => s.setSearchQuery)
 
   const [isDark, setIsDark] = useState(getInitialDarkMode)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const editorViewRef = useRef<import('@codemirror/view').EditorView | null>(null)
 
   const activeNote: Note | undefined = notes.find((n) => n.id === activeNoteId)
 
@@ -156,6 +158,22 @@ export function NoteApp() {
   const handleSaveStatusChange = useCallback((status: 'idle' | 'saving' | 'saved') => {
     setSaveStatus(status)
   }, [])
+
+  // Store editor view reference for focus restoration
+  const handleEditorCreated = useCallback((view: import('@codemirror/view').EditorView | null) => {
+    editorViewRef.current = view
+  }, [])
+
+  // Restore editor focus when switching to edit mode from preview (fixes mobile keyboard/cursor bug)
+  useEffect(() => {
+    if (viewMode === 'edit' && editorViewRef.current) {
+      // Delay to allow CSS transition and layout to settle
+      const timer = setTimeout(() => {
+        editorViewRef.current?.focus()
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [viewMode])
 
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-background">
@@ -299,30 +317,30 @@ export function NoteApp() {
 
             {/* Editor / Preview Area */}
             <div className="flex-1 overflow-hidden flex">
-              {/* Editor */}
-              {(viewMode === 'edit' || viewMode === 'split') && (
-                <div className={cn(
-                  'h-full overflow-hidden',
-                  viewMode === 'split' ? 'w-1/2 border-r border-border' : 'w-full'
-                )}>
-                  <CodeMirrorEditor
-                    key={activeNote.id}
-                    initialValue={activeNote.content}
-                    noteId={activeNote.id}
-                    isDark={isDark}
-                    fontSize={fontSize}
-                    onSaveStatusChange={handleSaveStatusChange}
-                  />
-                </div>
-              )}
+              {/* Editor — always mounted to prevent mobile keyboard/cursor bugs on view mode switch.
+                  Uses absolute + opacity-0 instead of display:none so CodeMirror keeps its layout
+                  and the IntersectionObserver can detect visibility changes. */}
+              <div className={cn(
+                'h-full overflow-hidden transition-all duration-200',
+                viewMode === 'edit' ? 'w-full relative' : viewMode === 'split' ? 'w-1/2 border-r border-border relative' : 'absolute opacity-0 pointer-events-none h-0 overflow-hidden w-0'
+              )}>
+                <CodeMirrorEditor
+                  key={activeNote.id}
+                  initialValue={activeNote.content}
+                  noteId={activeNote.id}
+                  isDark={isDark}
+                  fontSize={fontSize}
+                  onSaveStatusChange={handleSaveStatusChange}
+                  onEditorViewChange={handleEditorCreated}
+                />
+              </div>
 
               {/* Preview */}
-              {(viewMode === 'preview' || viewMode === 'split') && (
-                <div className={cn(
-                  'h-full overflow-hidden',
-                  viewMode === 'split' ? 'w-1/2' : 'w-full'
-                )}>
-                  <MarkdownPreview
+              <div className={cn(
+                'h-full overflow-hidden transition-all duration-200',
+                viewMode === 'preview' ? 'w-full relative' : viewMode === 'split' ? 'w-1/2 relative' : 'absolute opacity-0 pointer-events-none h-0 overflow-hidden w-0'
+              )}>
+                <MarkdownPreview
                     content={activeNote.content}
                     isDark={isDark}
                     fontSize={fontSize}
@@ -344,16 +362,37 @@ export function NoteApp() {
                       console.log('[Heading] Click:', headingId)
                     }}
                     onTagClick={(tagName) => {
-                      // TODO: Search for notes with matching tag
-                      console.log('[Tag] Search for:', tagName)
+                      // Search for notes containing this tag
+                      setSidebarOpen(true)
+                      setSearchQuery(`#${tagName}`)
                     }}
                     onEmbedClick={(source, heading, blockId) => {
-                      // TODO: Load and render the embedded note
-                      console.log('[Embed] Navigate to:', source, heading, blockId)
+                      // Navigate to the embedded note
+                      const matchedNote = notes.find(
+                        (n) => n.title.toLowerCase() === source.toLowerCase()
+                      )
+                      if (matchedNote) {
+                        setActiveNoteId(matchedNote.id)
+                        setViewMode('edit')
+                      } else {
+                        // No matching note — create one and navigate to it
+                        const now = Date.now()
+                        const newNote: Note = {
+                          id: Date.now().toString(36) + Math.random().toString(36).substring(2, 8),
+                          title: source,
+                          content: heading ? `# ${heading}\n\n` : '',
+                          createdAt: now,
+                          updatedAt: now,
+                        }
+                        useNotesStore.setState((state) => ({
+                          notes: [newNote, ...state.notes],
+                          activeNoteId: newNote.id,
+                          viewMode: 'edit' as ViewMode,
+                        }))
+                      }
                     }}
                   />
-                </div>
-              )}
+              </div>
             </div>
           </>
         ) : (

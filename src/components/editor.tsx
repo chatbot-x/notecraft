@@ -93,9 +93,10 @@ interface CodeMirrorEditorProps {
   isDark: boolean
   fontSize: number
   onSaveStatusChange: (status: 'idle' | 'saving' | 'saved') => void
+  onEditorViewChange?: (view: EditorView | null) => void
 }
 
-export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSaveStatusChange }: CodeMirrorEditorProps) {
+export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSaveStatusChange, onEditorViewChange }: CodeMirrorEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const isUpdatingRef = useRef(false)
@@ -299,11 +300,13 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
 
     viewRef.current = view
     setEditorView(view)
+    onEditorViewChange?.(view)
 
     return () => {
       view.destroy()
       viewRef.current = null
       setEditorView(null)
+      onEditorViewChange?.(null)
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     }
   }, [noteId])
@@ -341,6 +344,35 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
       isUpdatingRef.current = false
     }
   }, [noteId, initialValue])
+
+  // Restore focus when becoming visible after being hidden (mobile keyboard/cursor fix)
+  // The parent component also calls focus() via onEditorViewChange callback when
+  // switching view modes, but this IntersectionObserver provides a belt-and-suspenders
+  // approach that works regardless of how the editor becomes visible.
+  useEffect(() => {
+    const el = editorRef.current
+    if (!el) return
+
+    let wasVisible = true
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const isVisible = entry.isIntersecting && entry.intersectionRatio > 0
+        if (isVisible && !wasVisible && viewRef.current) {
+          requestAnimationFrame(() => {
+            if (viewRef.current) {
+              viewRef.current.focus()
+            }
+          })
+        }
+        wasVisible = isVisible
+      },
+      { threshold: 0 }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [noteId])
 
   return (
     <div className="h-full w-full flex flex-col codemirror-editor">
