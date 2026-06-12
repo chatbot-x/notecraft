@@ -12,6 +12,7 @@
  */
 
 import { createHighlighter, type Highlighter, type BundledLanguage, type BundledTheme } from 'shiki'
+import { logger } from '@/lib/utils'
 
 let highlighterPromise: Promise<Highlighter> | null = null
 
@@ -77,7 +78,7 @@ export async function highlightCode(
     // Wrap with line numbers and copy button
     return wrapCodeBlock(html, code, lang, showLineNumbers)
   } catch (err) {
-    console.warn('[Shiki] Highlighting failed:', err)
+    logger.warn('[Shiki] Highlighting failed:', err)
     // Fallback: plain code block
     return fallbackCodeBlock(code, lang)
   }

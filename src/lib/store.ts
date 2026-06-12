@@ -126,8 +126,8 @@ graph LR
 > [!note] Note
 > This is a note callout — great for highlighting important information.
 
-> [!important] Critical Deadline
-> The final code freeze is scheduled for July 15th. No exceptions.
+> [!important] Important
+> Click any heading in preview mode to jump straight to it in the editor.
 
 > [!tip] Tip
 > Try using \`Ctrl + Shift + F\` to format your Markdown with Prettier!
@@ -159,8 +159,8 @@ This text is visible. %%This text is hidden in the preview%% And this is also vi
 - [x] Build custom extension plugin
 - [x] Implement markdown-it rendering engine
 - [x] Add emoji, definition lists, front matter, foldable callouts
-- [ ] Add scroll sync between editor and preview
-- [ ] Add note search within content
+- [x] Add scroll sync between editor and preview
+- [x] Add note search within content
 
 ## Tables
 

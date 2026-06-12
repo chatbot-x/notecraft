@@ -44,7 +44,7 @@ import {
 import { Toolbar } from '@/lib/codemirror-ext'
 
 // Separate packages
-import { markdownTables, markdownTableAutocompleter, TableTheme, insertEmptyMarkdownTable } from 'codemirror-markdown-tables'
+import { markdownTables, markdownTableAutocompleter, TableTheme } from 'codemirror-markdown-tables'
 import { mermaid } from 'codemirror-lang-mermaid'
 
 const themeCompartment = new Compartment()

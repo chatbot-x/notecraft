@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { renderMarkdownSync, renderMarkdown, type RenderResult } from '@/lib/renderer'
 import mediumZoom, { type Zoom } from 'medium-zoom'
+import { toast } from '@/hooks/use-toast'
+import { logger } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,7 +57,7 @@ export function MarkdownPreview({
       const asyncResult = await renderMarkdown(content, { isDark })
       setRenderResult(asyncResult)
     } catch (err) {
-      console.error('[MarkdownPreview] Render error:', err)
+      logger.error('[MarkdownPreview] Render error:', err)
       // Fallback to sync render
       const fallback = renderMarkdownSync(content, { isDark })
       setRenderResult(fallback)
@@ -137,7 +139,7 @@ export function MarkdownPreview({
               container.removeAttribute('data-mermaid-source')
             }
           } catch (err) {
-            console.warn('[Mermaid] Render failed:', err)
+            logger.warn('[Mermaid] Render failed:', err)
             if (!cancelled) {
               container.innerHTML = `<div class="mermaid-error"><p>Failed to render diagram</p><pre><code>${source}</code></pre></div>`
               container.removeAttribute('data-mermaid-source')
@@ -145,7 +147,7 @@ export function MarkdownPreview({
           }
         }
       } catch (err) {
-        console.warn('[Mermaid] Library load failed:', err)
+        logger.warn('[Mermaid] Library load failed:', err)
       }
     }
 
@@ -183,6 +185,7 @@ export function MarkdownPreview({
             const originalTitle = copyBtn.getAttribute('title')
             copyBtn.setAttribute('title', 'Copied!')
             copyBtn.classList.add('copied')
+            toast({ title: 'Copied!', description: 'Code copied to clipboard' })
             setTimeout(() => {
               copyBtn.setAttribute('title', originalTitle ?? 'Copy code')
               copyBtn.classList.remove('copied')
@@ -272,7 +275,7 @@ export function MarkdownPreview({
   return (
     <div
       ref={containerRef}
-      className={`markdown-preview h-full overflow-auto px-8 py-6 ${isDark ? 'dark-preview' : 'light-preview'}`}
+      className="markdown-preview h-full overflow-auto px-8 py-6"
       style={{ fontSize: `${fontSize}px` }}
       dangerouslySetInnerHTML={{ __html: renderResult.html }}
     />

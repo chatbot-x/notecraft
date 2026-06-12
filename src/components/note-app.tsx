@@ -34,6 +34,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { jumpToHeading } from '@/lib/codemirror-ext/slug'
+import { toast } from '@/hooks/use-toast'
 
 function getInitialDarkMode(): boolean {
   if (typeof window === 'undefined') return false
@@ -358,13 +360,17 @@ export function NoteApp() {
                       }
                     }}
                     onHeadingClick={(headingId) => {
-                      // Scroll to heading in the editor (future: scroll sync)
-                      console.log('[Heading] Click:', headingId)
+                      // Jump to the heading in the editor and switch to edit mode
+                      if (editorViewRef.current) {
+                        jumpToHeading(headingId)(editorViewRef.current)
+                        setViewMode('edit')
+                      }
                     }}
                     onTagClick={(tagName) => {
                       // Search for notes containing this tag
                       setSidebarOpen(true)
                       setSearchQuery(`#${tagName}`)
+                      toast({ title: 'Searching', description: `Showing notes with #${tagName}` })
                     }}
                     onEmbedClick={(source, heading, blockId) => {
                       // Navigate to the embedded note
@@ -389,6 +395,7 @@ export function NoteApp() {
                           activeNoteId: newNote.id,
                           viewMode: 'edit' as ViewMode,
                         }))
+                        toast({ title: 'Note created', description: `Created "${source}" — click to start editing` })
                       }
                     }}
                   />

@@ -14,6 +14,7 @@
 import { EditorSelection, type ChangeSpec } from '@codemirror/state'
 import type { Command } from '@codemirror/view'
 import * as prettier from 'prettier'
+import { logger } from '@/lib/utils'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -499,7 +500,7 @@ export const formatDocument: Command = (view): boolean => {
 
     view.focus()
   }).catch((err) => {
-    console.warn('Markdown formatting failed:', err)
+    logger.warn('Markdown formatting failed:', err)
     view.focus()
   })
 
@@ -554,7 +555,7 @@ export function createFormatCommand(options: FormatDocumentOptions): Command {
 
       view.focus()
     }).catch((err) => {
-      console.warn('Markdown formatting failed:', err)
+      logger.warn('Markdown formatting failed:', err)
       view.focus()
     })
 

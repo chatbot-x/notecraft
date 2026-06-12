@@ -44,10 +44,19 @@ import frontMatter from 'markdown-it-front-matter'
 // DOMPurify — browser-only sanitization.
 // Since the preview component is client-only (ssr: false), DOMPurify is
 // only ever invoked in the browser. We use a lazy init pattern to avoid
-// requiring jsdom on the server (which breaks Cloudflare Workers).
+// importing jsdom on the server (which breaks Cloudflare Workers).
 let _dompurify: any = null
 
-function getPurify() {
+async function getPurify() {
+  if (!_dompurify) {
+    _dompurify = (await import('dompurify')).default
+  }
+  return _dompurify
+}
+
+// Synchronous fallback for renderMarkdownSync — uses require() since
+// this code path only runs in the browser where CJS compat is guaranteed.
+function getPurifySync() {
   if (!_dompurify) {
     _dompurify = require('dompurify')
   }
@@ -338,8 +347,8 @@ function extractHeadings(html: string): Array<{ id: string; text: string; level:
 
 // ─── Sanitize HTML ────────────────────────────────────────────────────────────
 
-function sanitizeHtml(html: string): string {
-  const purify = getPurify()
+async function sanitizeHtml(html: string): Promise<string> {
+  const purify = await getPurify()
   return purify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
@@ -355,6 +364,27 @@ function sanitizeHtml(html: string): string {
     ],
     ADD_TAGS: ['input'],
     // Allow data: URIs for images (base64 uploads)
+    ADD_DATA_URI_TAGS: ['img'],
+  })
+}
+
+/** Synchronous sanitization for renderMarkdownSync — only called in browser. */
+function sanitizeHtmlSync(html: string): string {
+  const purify = getPurifySync()
+  return purify.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    ADD_ATTR: [
+      'data-mermaid-source',
+      'data-callout', 'data-callout-foldable', 'data-callout-collapsed',
+      'data-admonition',
+      'data-code', 'data-lang',
+      'data-tag',
+      'data-embed-src', 'data-embed-type', 'data-embed-heading', 'data-embed-block',
+      'data-embed-placeholder',
+      'data-block-id',
+    ],
+    ADD_TAGS: ['input'],
     ADD_DATA_URI_TAGS: ['img'],
   })
 }
@@ -375,8 +405,8 @@ export async function renderMarkdown(
   // Step 1: Parse and render with markdown-it
   let html = md.render(markdown, env)
 
-  // Step 2: Sanitize with DOMPurify
-  html = sanitizeHtml(html)
+  // Step 2: Sanitize with DOMPurify (async)
+  html = await sanitizeHtml(html)
 
   // Step 3: Syntax highlight code blocks (async)
   html = await highlightAllCodeBlocks(html, opts.isDark ?? false)
@@ -412,7 +442,7 @@ export function renderMarkdownSync(
   const env: Record<string, unknown> = {}
 
   let html = md.render(markdown, env)
-  html = sanitizeHtml(html)
+  html = sanitizeHtmlSync(html)
 
   const headings = extractHeadings(html)
   const frontMatter = (md as any).__frontMatter?.value ?? null
