@@ -187,11 +187,18 @@ export function NoteApp() {
   // Restore editor focus when switching to edit mode from preview (fixes mobile keyboard/cursor bug)
   useEffect(() => {
     if (viewMode === 'edit' && editorViewRef.current) {
-      // Delay to allow CSS transition and layout to settle
-      const timer = setTimeout(() => {
-        editorViewRef.current?.focus()
-      }, 50)
-      return () => clearTimeout(timer)
+      // Use requestAnimationFrame to ensure layout is stable before focusing.
+      // Previously a 50ms setTimeout was used, but that fired during the CSS
+      // transition (200ms), corrupting CodeMirror's coordinate mappings on touch.
+      // Now we skip transitions entirely (no transition-all), so rAF is enough.
+      const raf = requestAnimationFrame(() => {
+        const view = editorViewRef.current
+        if (view) {
+          view.requestMeasure()  // Force CodeMirror to recalculate layout
+          view.focus()
+        }
+      })
+      return () => cancelAnimationFrame(raf)
     }
   }, [viewMode])
 
@@ -417,11 +424,13 @@ export function NoteApp() {
             {/* Editor / Preview Area */}
             <div className="flex-1 overflow-hidden flex">
               {/* Editor — always mounted to prevent mobile keyboard/cursor bugs on view mode switch.
-                  Uses absolute + opacity-0 instead of display:none so CodeMirror keeps its layout
-                  and the IntersectionObserver can detect visibility changes. */}
+                  Uses absolute + invisible + pointer-events-none instead of display:none so
+                  CodeMirror keeps its full layout and the IntersectionObserver can detect
+                  visibility changes. No CSS transitions on width/height to avoid corrupting
+                  CodeMirror's coordinate mappings (breaks touch input on mobile). */}
               <div ref={editorScrollRef} className={cn(
-                'h-full overflow-hidden transition-all duration-200',
-                viewMode === 'edit' ? 'w-full relative' : viewMode === 'split' ? 'w-1/2 border-r border-border relative' : 'absolute opacity-0 pointer-events-none h-0 overflow-hidden w-0'
+                'h-full overflow-hidden',
+                viewMode === 'edit' ? 'w-full relative' : viewMode === 'split' ? 'w-1/2 border-r border-border relative' : 'absolute invisible pointer-events-none w-full'
               )}>
                 <CodeMirrorEditor
                   key={activeNote.id}
@@ -435,9 +444,9 @@ export function NoteApp() {
               </div>
 
               {/* Preview */}
-              <div className={cn(
-                'h-full overflow-hidden transition-all duration-200',
-                viewMode === 'preview' ? 'w-full relative' : viewMode === 'split' ? 'w-1/2 relative' : 'absolute opacity-0 pointer-events-none h-0 overflow-hidden w-0'
+              <div ref={previewScrollRef} className={cn(
+                'h-full overflow-hidden',
+                viewMode === 'preview' ? 'w-full relative' : viewMode === 'split' ? 'w-1/2 relative' : 'absolute invisible pointer-events-none w-full'
               )}>
                 <MarkdownPreview
                     content={activeNote.content}

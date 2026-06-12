@@ -37,7 +37,9 @@ class CheckboxWidget extends WidgetType {
   }
 
   ignoreEvent(event: Event): boolean {
+    // Allow mouse, pointer, and touch events for checkbox interaction on all devices
     if (event instanceof MouseEvent) return false
+    if (event instanceof PointerEvent) return false
     return true
   }
 }

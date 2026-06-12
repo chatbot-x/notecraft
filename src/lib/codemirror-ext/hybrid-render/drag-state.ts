@@ -74,6 +74,16 @@ export const dragSelectHandlers = EditorView.domEventHandlers({
       view.dispatch({ effects: endDragSelect.of(undefined) })
     }
   },
+  pointerdown(event, view) {
+    if (event.button === 0) {
+      view.dispatch({ effects: startDragSelect.of(undefined) })
+    }
+  },
+  pointerup(event, view) {
+    if (event.button === 0) {
+      view.dispatch({ effects: endDragSelect.of(undefined) })
+    }
+  },
 })
 
 // ─── Update Action Helper ───────────────────────────────────────────────────────
