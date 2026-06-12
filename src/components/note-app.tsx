@@ -70,12 +70,28 @@ export function NoteApp() {
   const setFontSize = useNotesStore((s) => s.setFontSize)
   const setCommandPaletteOpen = useNotesStore((s) => s.setCommandPaletteOpen)
   const setSearchQuery = useNotesStore((s) => s.setSearchQuery)
+  const storeIsDark = useNotesStore((s) => s.isDark)
+  const hasHydrated = useNotesStore((s) => s.hasHydrated)
 
   const [isDark, setIsDark] = useState(getInitialDarkMode)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const editorViewRef = useRef<import('@codemirror/view').EditorView | null>(null)
+  const editorScrollRef = useRef<HTMLDivElement | null>(null)
+  const previewScrollRef = useRef<HTMLDivElement | null>(null)
+  const syncScrollRef = useRef<'editor' | 'preview' | null>(null)
 
   const activeNote: Note | undefined = notes.find((n) => n.id === activeNoteId)
+
+  // Sync dark mode from store to DOM on mount and when store changes
+  useEffect(() => {
+    const classList = document.documentElement.classList
+    if (storeIsDark && !classList.contains('dark')) {
+      classList.add('dark')
+    } else if (!storeIsDark && classList.contains('dark')) {
+      classList.remove('dark')
+    }
+    setIsDark(storeIsDark)
+  }, [storeIsDark])
 
   // Watch for dark mode changes
   useEffect(() => {
@@ -91,7 +107,10 @@ export function NoteApp() {
   }, [])
 
   const toggleTheme = useCallback(() => {
+    const newIsDark = !document.documentElement.classList.contains('dark')
     document.documentElement.classList.toggle('dark')
+    useNotesStore.setState({ isDark: newIsDark })
+    setIsDark(newIsDark)
   }, [])
 
   // Auto-select first note
@@ -101,10 +120,10 @@ export function NoteApp() {
     }
   }, [activeNoteId, notes, setActiveNoteId])
 
-  // Create welcome note on first visit
+  // Create welcome note on first visit (uses store state instead of separate localStorage key)
   useEffect(() => {
-    const hasVisited = localStorage.getItem('notecraft-visited')
-    if (!hasVisited && notes.length === 0) {
+    if (!hasHydrated) return
+    if (notes.length === 0) {
       const now = Date.now()
       const welcomeNote: Note = {
         id: WELCOME_NOTE_ID,
@@ -117,9 +136,8 @@ export function NoteApp() {
         notes: [welcomeNote],
         activeNoteId: WELCOME_NOTE_ID,
       })
-      localStorage.setItem('notecraft-visited', 'true')
     }
-  }, [notes.length])
+  }, [hasHydrated, notes.length])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -177,14 +195,69 @@ export function NoteApp() {
     }
   }, [viewMode])
 
+  // Split-view scroll sync — percentage-based bidirectional sync
+  useEffect(() => {
+    if (viewMode !== 'split') return
+
+    const editorEl = editorScrollRef.current
+    const previewEl = previewScrollRef.current
+    if (!editorEl || !previewEl) return
+
+    // Get the actual scrollable containers
+    const editorScroller = editorEl.querySelector('.cm-scroller') as HTMLElement | null
+    if (!editorScroller) return
+
+    const handleEditorScroll = () => {
+      if (syncScrollRef.current === 'preview') {
+        syncScrollRef.current = null
+        return
+      }
+      syncScrollRef.current = 'editor'
+      const maxScroll = editorScroller.scrollHeight - editorScroller.clientHeight
+      if (maxScroll <= 0) return
+      const ratio = editorScroller.scrollTop / maxScroll
+      const previewMaxScroll = previewEl.scrollHeight - previewEl.clientHeight
+      previewEl.scrollTop = ratio * previewMaxScroll
+    }
+
+    const handlePreviewScroll = () => {
+      if (syncScrollRef.current === 'editor') {
+        syncScrollRef.current = null
+        return
+      }
+      syncScrollRef.current = 'preview'
+      const maxScroll = previewEl.scrollHeight - previewEl.clientHeight
+      if (maxScroll <= 0) return
+      const ratio = previewEl.scrollTop / maxScroll
+      const editorMaxScroll = editorScroller.scrollHeight - editorScroller.clientHeight
+      editorScroller.scrollTop = ratio * editorMaxScroll
+    }
+
+    editorScroller.addEventListener('scroll', handleEditorScroll)
+    previewEl.addEventListener('scroll', handlePreviewScroll)
+
+    return () => {
+      editorScroller.removeEventListener('scroll', handleEditorScroll)
+      previewEl.removeEventListener('scroll', handlePreviewScroll)
+    }
+  }, [viewMode, activeNoteId])
+
   return (
     <div className="h-screen w-screen flex overflow-hidden bg-background">
       <Sidebar />
       <CommandPalette />
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0">
-        {activeNote ? (
+      {/* Hydration guard — prevent flash of empty state before localStorage rehydrates */}
+      {!hasHydrated ? (
+        <main className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading notes...
+          </div>
+        </main>
+      ) : (
+        <main className="flex-1 flex flex-col min-w-0">
+          {activeNote ? (
           <>
             {/* Editor Toolbar */}
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-card/80 backdrop-blur-sm">
@@ -322,7 +395,7 @@ export function NoteApp() {
               {/* Editor — always mounted to prevent mobile keyboard/cursor bugs on view mode switch.
                   Uses absolute + opacity-0 instead of display:none so CodeMirror keeps its layout
                   and the IntersectionObserver can detect visibility changes. */}
-              <div className={cn(
+              <div ref={editorScrollRef} className={cn(
                 'h-full overflow-hidden transition-all duration-200',
                 viewMode === 'edit' ? 'w-full relative' : viewMode === 'split' ? 'w-1/2 border-r border-border relative' : 'absolute opacity-0 pointer-events-none h-0 overflow-hidden w-0'
               )}>
@@ -346,6 +419,8 @@ export function NoteApp() {
                     content={activeNote.content}
                     isDark={isDark}
                     fontSize={fontSize}
+                    notes={notes.map(n => ({ title: n.title, content: n.content }))}
+                    scrollContainerRef={previewScrollRef}
                     onTaskToggle={(lineNumber, checked) => {
                       // Toggle the checkbox in the editor source
                       const lines = activeNote.content.split('\n')
@@ -438,6 +513,7 @@ export function NoteApp() {
           </div>
         )}
       </main>
+      )}
     </div>
   )
 }

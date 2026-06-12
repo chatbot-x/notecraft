@@ -133,7 +133,7 @@ const ALLOWED_TAGS = [
   'em', 'embed',
   'fieldset', 'figcaption', 'figure', 'footer', 'form',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr',
-  'i', 'iframe', 'img', 'input', 'ins',
+  'i', 'img', 'input', 'ins',
   'kbd',
   'label', 'legend', 'li',
   'main', 'map', 'mark', 'math', 'meter',
@@ -158,8 +158,6 @@ const ALLOWED_TAGS = [
   'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
   'text', 'g', 'defs', 'clippath', 'lineargradient', 'radialgradient',
   'stop', 'title', 'desc', 'tspan', 'use', 'pattern', 'image', 'foreignobject',
-  // Custom
-  'input',  // for task list checkboxes
 ]
 
 const ALLOWED_ATTR = [

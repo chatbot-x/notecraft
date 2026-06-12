@@ -23,6 +23,7 @@ interface NotesState {
   saveStatus: 'idle' | 'saving' | 'saved'
   commandPaletteOpen: boolean
   hasHydrated: boolean
+  isDark: boolean
 
   // Actions
   setActiveNoteId: (id: string | null) => void
@@ -159,7 +160,7 @@ This text is visible. %%This text is hidden in the preview%% And this is also vi
 - [x] Build custom extension plugin
 - [x] Implement markdown-it rendering engine
 - [x] Add emoji, definition lists, front matter, foldable callouts
-- [x] Add scroll sync between editor and preview
+- [x] Add scroll sync between editor and preview (split view)
 - [x] Add note search within content
 
 ## Tables
@@ -196,6 +197,7 @@ export const useNotesStore = create<NotesState>()(
       saveStatus: 'idle' as 'idle' | 'saving' | 'saved',
       commandPaletteOpen: false,
       hasHydrated: false,
+      isDark: false,
 
       setActiveNoteId: (id) => set({ activeNoteId: id }),
       setSearchQuery: (query) => set({ searchQuery: query }),
@@ -295,6 +297,7 @@ export const useNotesStore = create<NotesState>()(
         sidebarOpen: state.sidebarOpen,
         viewMode: state.viewMode,
         fontSize: state.fontSize,
+        isDark: state.isDark,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

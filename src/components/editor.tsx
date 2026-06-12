@@ -46,41 +46,15 @@ import { Toolbar } from '@/lib/codemirror-ext'
 // Separate packages
 import { markdownTables, markdownTableAutocompleter, TableTheme } from 'codemirror-markdown-tables'
 import { mermaid } from 'codemirror-lang-mermaid'
+import { imageDataUrlHandler } from '@/lib/image-upload'
 
 const themeCompartment = new Compartment()
 const fontSizeCompartment = new Compartment()
 
-// ─── Image Upload Handler ──────────────────────────────────────────────────────
-
-/**
- * Default image upload handler.
- * Converts the file to a data URL for local-only storage.
- * Replace this with your own upload logic for server-based storage.
- */
-function handleImageUpload({ file, callback }: { id: string; file: File; callback: { progress: (n: number) => void; fail: (e: Error) => void; success: (u: string) => void } }) {
-  const reader = new FileReader()
-
-  reader.onprogress = (e) => {
-    if (e.lengthComputable) {
-      callback.progress(Math.round((e.loaded / e.total) * 100))
-    }
-  }
-
-  reader.onload = () => {
-    callback.success(reader.result as string)
-  }
-
-  reader.onerror = () => {
-    callback.fail(new Error('Failed to read file'))
-  }
-
-  reader.readAsDataURL(file)
-}
-
 // ─── Image upload command for toolbar ──────────────────────────────────────────
 
 const imageUploadCommand = createImageUploadCommand({
-  action: handleImageUpload,
+  action: imageDataUrlHandler,
   enableDrop: true,
   enablePaste: true,
 })
@@ -160,7 +134,7 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
       editorExtTheme,
       // Image upload with drag-drop and paste support
       imageUpload({
-        action: handleImageUpload,
+        action: imageDataUrlHandler,
         enableDrop: true,
         enablePaste: true,
       }),

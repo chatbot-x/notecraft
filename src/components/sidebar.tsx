@@ -34,6 +34,7 @@ import {
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useMemo } from 'react'
 
 export function Sidebar() {
   const {
@@ -51,7 +52,7 @@ export function Sidebar() {
     setCommandPaletteOpen,
   } = useNotesStore()
 
-  const filteredNotes = getFilteredNotes()
+  const filteredNotes = useMemo(() => getFilteredNotes(), [notes, searchQuery, getFilteredNotes])
 
   const handleCreateNote = () => {
     createNote()
@@ -207,7 +208,13 @@ export function Sidebar() {
                     transition={{ duration: 0.15 }}
                   >
                     <div
-                      onClick={() => setActiveNoteId(note.id)}
+                      onClick={() => {
+                        setActiveNoteId(note.id)
+                        // Close sidebar on mobile after selecting a note
+                        if (window.innerWidth < 768) {
+                          setSidebarOpen(false)
+                        }
+                      }}
                       className={cn(
                         'group relative flex flex-col gap-0.5 rounded-lg px-3 py-2 cursor-pointer transition-all',
                         activeNoteId === note.id

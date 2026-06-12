@@ -45,6 +45,7 @@ function buildAtomicRanges(view: EditorView): AtomicRange[] {
 
     // ── Embed images ![[...]] ────────────────────────────────
     EMBED_IMAGE_RE.lastIndex = 0
+    let match: RegExpExecArray | null
     while ((match = EMBED_IMAGE_RE.exec(visibleText)) !== null) {
       const start = from + match.index
       const end = start + match[0].length

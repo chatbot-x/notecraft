@@ -125,8 +125,6 @@ const suggestionDecorator = ViewPlugin.fromClass(class implements PluginValue {
 
 // ─── Fetch Plugin ──────────────────────────────────────────────────────────────
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
 function createFetchPlugin(
   fetchFn: (state: EditorState) => Promise<string | Suggestion>,
   delay: number,
@@ -135,6 +133,7 @@ function createFetchPlugin(
 ): Extension {
   const plugin = ViewPlugin.fromClass(class implements PluginValue {
     private destroyed = false
+    private debounceTimer: ReturnType<typeof setTimeout> | null = null
 
     constructor(readonly view: EditorView) {}
 
@@ -152,8 +151,8 @@ function createFetchPlugin(
     }
 
     scheduleFetch() {
-      if (debounceTimer) clearTimeout(debounceTimer)
-      debounceTimer = setTimeout(() => this.fetch(), delay)
+      if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = setTimeout(() => this.fetch(), delay)
     }
 
     async fetch() {
@@ -186,7 +185,7 @@ function createFetchPlugin(
 
     destroy() {
       this.destroyed = true
-      if (debounceTimer) clearTimeout(debounceTimer)
+      if (this.debounceTimer) clearTimeout(this.debounceTimer)
     }
   })
 

@@ -5,6 +5,7 @@ import { renderMarkdownSync, renderMarkdown, type RenderResult } from '@/lib/ren
 import mediumZoom, { type Zoom } from 'medium-zoom'
 import { toast } from '@/hooks/use-toast'
 import { logger } from '@/lib/utils'
+import { Loader2 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,10 @@ interface MarkdownPreviewProps {
   onTagClick?: (tagName: string) => void
   /** Callback when an embed note is clicked */
   onEmbedClick?: (source: string, heading?: string, blockId?: string) => void
+  /** Notes data for resolving embed placeholders */
+  notes?: Array<{ title: string; content: string }>
+  /** Ref to the scroll container (for parent scroll sync) */
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -32,6 +37,8 @@ export function MarkdownPreview({
   onHeadingClick,
   onTagClick,
   onEmbedClick,
+  notes,
+  scrollContainerRef,
 }: MarkdownPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [renderResult, setRenderResult] = useState<RenderResult>({ html: '', headings: [], frontMatter: null })
@@ -74,6 +81,46 @@ export function MarkdownPreview({
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [renderContent])
+
+  // ─── Resolve Embed Placeholders ────────────────────────────────────
+
+  useEffect(() => {
+    if (!containerRef.current || !notes || notes.length === 0) return
+
+    const placeholders = containerRef.current.querySelectorAll('.embed-note-content[data-embed-placeholder="true"]')
+    if (placeholders.length === 0) return
+
+    for (const placeholder of placeholders) {
+      const embedContainer = placeholder.closest('.embed-note') as HTMLElement | null
+      if (!embedContainer) continue
+
+      const source = embedContainer.dataset.embedSrc
+      if (!source) continue
+
+      // Find the matching note by title (case-insensitive)
+      const matchedNote = notes.find(
+        (n) => n.title.toLowerCase() === source.toLowerCase()
+      )
+
+      if (matchedNote) {
+        // Render the embedded note's content (sync for speed)
+        try {
+          const { renderMarkdownSync } = require('@/lib/renderer')
+          const result = renderMarkdownSync(matchedNote.content, { isDark })
+          placeholder.innerHTML = result.html
+          placeholder.removeAttribute('data-embed-placeholder')
+          placeholder.classList.add('embed-resolved')
+        } catch {
+          // If rendering fails, show a link to the note instead
+          placeholder.innerHTML = `<p class="embed-error">Could not render embedded note.</p>`
+          placeholder.removeAttribute('data-embed-placeholder')
+        }
+      } else {
+        placeholder.innerHTML = `<p class="embed-not-found">Note "${source}" not found. Click header to create it.</p>`
+        placeholder.removeAttribute('data-embed-placeholder')
+      }
+    }
+  }, [renderResult.html, isDark, notes])
 
   // ─── Initialize Medium Zoom ──────────────────────────────────────────
 
@@ -121,10 +168,11 @@ export function MarkdownPreview({
         mermaid.initialize({
           startOnLoad: false,
           theme: isDark ? 'dark' : 'default',
-          securityLevel: 'loose',
+          securityLevel: 'strict',
           fontFamily: 'inherit',
         })
 
+        let mermaidCounter = 0
         for (const container of mermaidContainers) {
           if (cancelled) break
 
@@ -132,7 +180,7 @@ export function MarkdownPreview({
           if (!source) continue
 
           try {
-            const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`
+            const id = `mermaid-${++mermaidCounter}`
             const { svg } = await mermaid.render(id, source)
             if (!cancelled) {
               container.innerHTML = svg
@@ -273,11 +321,23 @@ export function MarkdownPreview({
   // ─── Render ──────────────────────────────────────────────────────────
 
   return (
-    <div
-      ref={containerRef}
-      className="markdown-preview h-full overflow-auto px-8 py-6"
-      style={{ fontSize: `${fontSize}px` }}
-      dangerouslySetInnerHTML={{ __html: renderResult.html }}
-    />
+    <div className="relative h-full">
+      {isRendering && (
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 text-[11px] text-muted-foreground bg-background/80 backdrop-blur-sm rounded-md px-2 py-1">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Rendering...
+        </div>
+      )}
+      <div
+        ref={(el) => {
+          // Merge both refs
+          (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+          if (scrollContainerRef) scrollContainerRef.current = el
+        }}
+        className="markdown-preview h-full overflow-auto px-8 py-6"
+        style={{ fontSize: `${fontSize}px` }}
+        dangerouslySetInnerHTML={{ __html: renderResult.html }}
+      />
+    </div>
   )
 }

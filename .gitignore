@@ -60,6 +60,9 @@ server.log
 # Download artifacts
 /download/
 
+# Upload artifacts
+/upload/
+
 # Worklog
 worklog.md
 

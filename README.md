@@ -419,7 +419,7 @@ NoteCraft builds a rich set of CodeMirror 6 extensions, some based on existing o
 | **Markdown Commands** | [`yeliex/codemirror-markdown-commands`](https://github.com/yeliex/codemirror-markdown-commands) | Added toggle support (wrap/unwrap), smart cursor placement, heading cycling, document formatting |
 | **Toolbar** | [`yeliex/codemirror-toolbar`](https://github.com/yeliex/codemirror-toolbar) | Replaced static DOM with React portal, Lucide icons, shadcn/ui dropdown menus, callout picker |
 | **Image Upload** | [`yeliex/codemirror-markdown-image`](https://github.com/yeliex/codemirror-markdown-image) | Enhanced with progress tracking, drag-and-drop, paste-to-upload, linter for upload status |
-| **Inline Suggestion** | [`rizerphe/codemirror-companion-extension`](https://github.com/rizerphe/codemirror-companion-extension) | Stabilized API, debounced fetch, Tab accept, Escape dismiss |
+| **Inline Suggestion** | [`rizerphe/codemirror-companion-extension`](https://github.com/rizerphe/codemirror-companion-extension) | Stabilized API, debounced fetch, Tab accept, Escape dismiss *(experimental — requires fetch function to activate)* |
 | **Final Newline** | [`yeliex/codemirror-final-newline`](https://github.com/yeliex/codemirror-final-newline) | Configurable with focus-only mode |
 
 ### Original Extensions
@@ -642,8 +642,6 @@ All rendered HTML passes through DOMPurify with a carefully curated allowlist:
 | `Ctrl+I` | Italic |
 | `Ctrl+`` ` | Inline code |
 | `Ctrl+Shift+I` | Upload image |
-| `Tab` | Accept inline suggestion |
-| `Escape` | Dismiss inline suggestion |
 | `/` | Open slash command menu |
 
 ---

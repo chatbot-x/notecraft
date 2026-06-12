@@ -25,6 +25,7 @@ import {
 } from '../commands'
 import { createImageUploadCommand } from '../image'
 import { copyHeadingSlug, setHeadingSlug } from '../slug'
+import { imageDataUrlHandler } from '@/lib/image-upload'
 
 // ─── Slash Command Definitions ─────────────────────────────────────────────────
 
@@ -43,17 +44,8 @@ export interface SlashCommandOption {
 
 // ─── Helper: Create a slash command that runs a CM6 Command ────────────────────
 
-// Default image upload handler for slash command
-function defaultImageUploadHandler({ file, callback }: { id: string; file: File; callback: { progress: (n: number) => void; fail: (e: Error) => void; success: (u: string) => void } }) {
-  const reader = new FileReader()
-  reader.onprogress = (e) => { if (e.lengthComputable) callback.progress(Math.round((e.loaded / e.total) * 100)) }
-  reader.onload = () => callback.success(reader.result as string)
-  reader.onerror = () => callback.fail(new Error('Failed to read file'))
-  reader.readAsDataURL(file)
-}
-
 const slashImageUploadCommand = createImageUploadCommand({
-  action: defaultImageUploadHandler,
+  action: imageDataUrlHandler,
   enableDrop: true,
   enablePaste: true,
 })
