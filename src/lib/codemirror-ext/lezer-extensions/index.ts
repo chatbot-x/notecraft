@@ -7,7 +7,6 @@
  * - `%%comments%%`      → Comment, CommentMark, CommentContent
  * - `#tags`             → Tag, TagMark, TagName
  * - `^block-refs`       → BlockRef, BlockRefMark, BlockRefId
- * - `[[wikilinks]]`     → Wikilink, WikilinkMark, WikilinkTarget, WikilinkAlias
  * - `![[embeds]]`       → Embed, EmbedMark, EmbedTarget
  * - `---frontmatter---` → Frontmatter, FrontmatterMark, FrontmatterContent
  * - `> [!callouts]`     → Callout, CalloutMark, CalloutType, CalloutFoldMark
@@ -31,8 +30,7 @@
  * ```
  * Comment  → before → Escape        (captures %% before escape)
  * Tag      → before → Escape        (captures #tag before # heading; ATXHeading is a block parser, not inline)
- * Embed    → before → Link          (captures ![[ before [; Wikilink is custom, not a built-in parser)
- * Wikilink → before → Link          (captures [[ before [)
+ * Embed    → before → Link          (captures ![[ before [)
  * Callout  → before → Link          (captures [! before [)
  * BlockRef → after  → Escape        (late, after most inline parsing)
  * ```
@@ -43,22 +41,18 @@
  * Frontmatter → before → HorizontalRule  (--- at pos 0 is frontmatter, not HR)
  * ```
  *
- * ## Level 1 → Level 2 Migration
+ * ## Migration Note
  *
- * With these extensions, the Level 1 decoration plugins can switch from
- * regex-based scanning to syntax-tree-based scanning. This provides:
- *
- * - No false positives in code blocks (tree already excludes them)
- * - Incremental parsing (only re-parses changed regions)
- * - Structural navigation and selection
- * - Future: code folding, autocomplete, diagnostics
+ * Wikilinks (`[[...]]`) have been removed. Embeds (`![[...]]`) are now a
+ * standalone transform that doesn't depend on wikilinks. The `![[` prefix
+ * is matched directly by the Embed parser without needing a Wikilink parser
+ * to exist first.
  */
 
 import type { MarkdownExtension } from '@lezer/markdown'
 import { commentExtension } from './comments'
 import { tagExtension } from './tags'
 import { blockRefExtension } from './block-refs'
-import { wikilinkExtension } from './wikilinks'
 import { embedExtension } from './embeds'
 import { frontmatterExtension } from './frontmatter'
 import { calloutExtension } from './callouts'
@@ -76,7 +70,6 @@ export const obsidianExtensions: MarkdownExtension = [
   blockRefExtension,
 
   // Phase B: Core Obsidian syntax
-  wikilinkExtension,
   embedExtension,
   frontmatterExtension,
 
@@ -89,7 +82,6 @@ export {
   commentExtension,
   tagExtension,
   blockRefExtension,
-  wikilinkExtension,
   embedExtension,
   frontmatterExtension,
   calloutExtension,

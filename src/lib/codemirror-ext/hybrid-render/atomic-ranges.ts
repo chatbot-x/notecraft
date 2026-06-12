@@ -18,7 +18,6 @@
 import { EditorView, Decoration } from '@codemirror/view'
 import { RangeSetBuilder, RangeValue } from '@codemirror/state'
 import {
-  WIKILINK_RE,
   EMBED_IMAGE_RE,
   TAG_RE,
   isCursorInRange,
@@ -43,17 +42,6 @@ function buildAtomicRanges(view: EditorView): AtomicRange[] {
 
   for (const { from, to } of view.visibleRanges) {
     const visibleText = doc.sliceString(from, to)
-
-    // ── Wikilinks [[...]] ────────────────────────────────────
-    WIKILINK_RE.lastIndex = 0
-    let match: RegExpExecArray | null
-    while ((match = WIKILINK_RE.exec(visibleText)) !== null) {
-      const start = from + match.index
-      const end = start + match[0].length
-      if (!isCursorInRange(state, start, end)) {
-        ranges.push({ from: start, to: end })
-      }
-    }
 
     // ── Embed images ![[...]] ────────────────────────────────
     EMBED_IMAGE_RE.lastIndex = 0
@@ -83,7 +71,7 @@ function buildAtomicRanges(view: EditorView): AtomicRange[] {
 /**
  * The atomic ranges extension.
  *
- * Note: The wikilinks, tags, and links plugins now self-provide atomic ranges
+ * Note: The tags, links, and embedImages plugins now self-provide atomic ranges
  * via the `provide` pattern. This extension serves as a safety net for any
  * ranges that might be missed (e.g., if the plugin-provided ranges don't
  * cover all cases).

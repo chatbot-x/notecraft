@@ -217,9 +217,6 @@ export const frontmatterCollapsedMark = Decoration.mark({
 
 // ─── Regex Patterns ───────────────────────────────────────────────────────────
 
-/** Match [[wikilink]] or [[target|label]] */
-export const WIKILINK_RE = /\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g
-
 /** Match ![[embed]] with optional size: ![[image.png|300]] or ![[image.png|300x200]] */
 export const EMBED_IMAGE_RE = /!\[\[([^\]|]+?)(?:\|(\d+(?:x\d+)?))?\]\]/g
 
@@ -256,8 +253,6 @@ export const ADMONITION_FENCE_RE = /^(~~~+|```+)\s*ad-(\w+)\s*(?:"([^"]*)")?(?:\
 // ─── Feature Flags Type ───────────────────────────────────────────────────────
 
 export interface HybridRenderOptions {
-  /** Obsidian wikilinks [[note]] and [[note|label]]. Default: true */
-  wikilinks?: boolean
   /** Obsidian embed images ![[img.png|300]]. Default: true */
   embedImages?: boolean
   /** Standard markdown images ![alt](url). Default: true */

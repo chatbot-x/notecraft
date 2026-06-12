@@ -351,22 +351,6 @@ export function NoteApp() {
                       // TODO: Load and render the embedded note
                       console.log('[Embed] Navigate to:', source, heading, blockId)
                     }}
-                    onWikilinkClick={(pageName, heading, blockId) => {
-                      // Navigate to the linked note (or create it)
-                      if (pageName) {
-                        const matchingNote = notes.find(
-                          (n) => n.title.toLowerCase() === pageName.toLowerCase()
-                            || n.title.toLowerCase() === pageName.replace(/%20/g, ' ').toLowerCase()
-                        )
-                        if (matchingNote) {
-                          setActiveNoteId(matchingNote.id)
-                        } else {
-                          console.log('[Wikilink] Note not found:', pageName)
-                        }
-                      }
-                      if (heading) console.log('[Wikilink] Heading:', heading)
-                      if (blockId) console.log('[Wikilink] Block:', blockId)
-                    }}
                   />
                 </div>
               )}

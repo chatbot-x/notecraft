@@ -14,16 +14,13 @@
  * - `![[image.png|300]]` — embed image with size
  * - `![[note|label]]` — embed with display label (Obsidian 1.x+)
  *
- * The embed syntax is `![[...]]` — the `!` prefix distinguishes it from a
- * plain wikilink `[[...]]`. The target inside `[[...]]` follows the same
- * rules as wikilink targets.
+ * The embed syntax is `![[...]]` — the `!` prefix followed by double brackets
+ * uniquely identifies it. This is a standalone parser that does not depend on
+ * any wikilink parser.
  *
  * ## Inline Parser Design
  *
  * - Runs `before: "Link"` to intercept `![[` before the Link parser.
- *   The Wikilink extension also runs `before: "Link"`, and since Embed
- *   checks for `!` + `[[` while Wikilink only checks `[[`, the embed
- *   parser naturally takes precedence when `![[` appears.
  * - On seeing `!` at pos, checks if followed by `[[`
  * - Scans forward to find `]]`
  * - Produces an Embed element with EmbedMark children for `![[` and `]]`

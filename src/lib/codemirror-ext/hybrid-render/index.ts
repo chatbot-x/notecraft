@@ -12,7 +12,7 @@
  * ### Inline Features (ViewPlugin)
  * - `heading-marks.ts`    — Hide `#` on headings + heading size styling
  * - `emphasis-marks.ts`   — Hide `**`, `*`, `_`, `__`, `~~` delimiters
- * - `wikilinks.ts`        — Style [[wikilinks]], self-provides atomic ranges
+ * - `wikilinks.ts`        — Style ![[embed images]] with thumbnail widgets
  * - `links.ts`            — Style [links](url) and ![images](url)
  * - `checkboxes.ts`       — Interactive checkbox widgets
  * - `inline-code.ts`      — Inline code background + hide backticks
@@ -63,7 +63,7 @@ import type { HybridRenderOptions } from './shared'
 // Feature plugins — ViewPlugin-based (inline decorations)
 import { headingMarksPlugin } from './heading-marks'
 import { emphasisMarksPlugin } from './emphasis-marks'
-import { wikilinksPlugin } from './wikilinks'
+import { embedImagesPlugin } from './wikilinks'
 import { linksPlugin } from './links'
 import { checkboxesPlugin } from './checkboxes'
 import { inlineMathPlugin } from './math'
@@ -118,7 +118,6 @@ export type { HybridRenderOptions }
 export function hybridRender(opts: HybridRenderOptions = {}): Extension {
   const features = {
     // Original features
-    wikilinks: opts.wikilinks ?? true,
     embedImages: opts.embedImages ?? true,
     images: opts.images ?? true,
     links: opts.links ?? true,
@@ -149,7 +148,7 @@ export function hybridRender(opts: HybridRenderOptions = {}): Extension {
 
   // ── Core features (always recommended) ──────────────────────────────────
   if (features.checkboxes) extensions.push(checkboxesPlugin)
-  if (features.wikilinks || features.embedImages) extensions.push(wikilinksPlugin)
+  if (features.embedImages) extensions.push(embedImagesPlugin)
   if (features.links || features.images) extensions.push(linksPlugin)
   if (features.math) {
     extensions.push(displayMathField)  // StateField for block math
@@ -181,7 +180,7 @@ export function hybridRender(opts: HybridRenderOptions = {}): Extension {
   // Most plugins now self-provide atomic ranges via the `provide` pattern.
   // This is kept as a safety net.
   if (
-    features.wikilinks || features.embedImages || features.images ||
+    features.embedImages || features.images ||
     features.tags || features.links || features.comments ||
     features.embedTransclusions
   ) {
