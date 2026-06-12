@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 const NoteApp = dynamic(() => import('@/components/note-app').then((mod) => ({ default: mod.NoteApp })), {
   ssr: false,
@@ -15,5 +16,9 @@ const NoteApp = dynamic(() => import('@/components/note-app').then((mod) => ({ d
 })
 
 export default function Home() {
-  return <NoteApp />
+  return (
+    <ErrorBoundary>
+      <NoteApp />
+    </ErrorBoundary>
+  )
 }

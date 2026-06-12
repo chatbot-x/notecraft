@@ -360,7 +360,6 @@ async function sanitizeHtml(html: string): Promise<string> {
       'data-embed-placeholder',
       'data-block-id',
     ],
-    ADD_TAGS: ['input'],
     // Allow data: URIs for images (base64 uploads)
     ADD_DATA_URI_TAGS: ['img'],
   })
@@ -382,7 +381,6 @@ function sanitizeHtmlSync(html: string): string {
       'data-embed-placeholder',
       'data-block-id',
     ],
-    ADD_TAGS: ['input'],
     ADD_DATA_URI_TAGS: ['img'],
   })
 }

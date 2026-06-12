@@ -61,7 +61,7 @@ export type { InlineSuggestionOptions, Suggestion, ForceableInlineSuggestionResu
 export {
   copyHeadingSlug, setHeadingSlug, removeHeadingSlug, jumpToHeading,
   generateSlug, generateSlugWithSlugger, parseHeading, scanDocumentHeadings,
-  getCurrentHeadingSlug,
+  getCurrentHeadingSlug, slugPanelExtensions,
 } from './slug'
 
 // Final newline

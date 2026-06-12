@@ -36,10 +36,12 @@ import { lintKeymap } from '@codemirror/lint'
 import { useNotesStore } from '@/lib/store'
 import {
   toolbarPlugin, slashCommands, editorExtTheme,
-  imageUpload, createImageUploadCommand,
+  imageUpload,
   finalNewline,
   formatDocument,
   hybridRender,
+  inlineSuggestion,
+  slugPanelExtensions,
 } from '@/lib/codemirror-ext'
 import { Toolbar } from '@/lib/codemirror-ext'
 
@@ -50,14 +52,6 @@ import { imageDataUrlHandler } from '@/lib/image-upload'
 
 const themeCompartment = new Compartment()
 const fontSizeCompartment = new Compartment()
-
-// ─── Image upload command for toolbar ──────────────────────────────────────────
-
-const imageUploadCommand = createImageUploadCommand({
-  action: imageDataUrlHandler,
-  enableDrop: true,
-  enablePaste: true,
-})
 
 // ─── Editor Component ──────────────────────────────────────────────────────────
 
@@ -143,6 +137,15 @@ export function CodeMirrorEditor({ initialValue, noteId, isDark, fontSize, onSav
       // Hybrid render — Obsidian-style Live Preview decorations
       // (checkboxes, image thumbs, math, link styling)
       hybridRender(),
+      // Inline AI suggestion — ghost text with Tab-to-accept
+      // Replace fetchFn with your AI backend for real suggestions
+      ...inlineSuggestion({
+        fetchFn: async () => '',  // no-op until AI backend is wired
+        delay: 1000,
+        accept_shortcut: 'Tab',
+      }),
+      // Slug input panel (replaces browser prompt() for heading ID)
+      ...slugPanelExtensions,
       themeCompartment.of(isDark ? oneDark : []),
       fontSizeCompartment.of(EditorView.theme({
         '&': { fontSize: `${fontSize}px` },

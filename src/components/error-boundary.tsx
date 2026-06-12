@@ -1,10 +1,13 @@
 'use client'
 
-import { Component, type ReactNode } from 'react'
+import React from 'react'
 import { Button } from '@/components/ui/button'
+import { AlertTriangle, RefreshCw } from 'lucide-react'
 
 interface ErrorBoundaryProps {
-  children: ReactNode
+  children: React.ReactNode
+  /** Optional fallback UI; receives the error and a retry callback */
+  fallback?: (error: Error, retry: () => void) => React.ReactNode
 }
 
 interface ErrorBoundaryState {
@@ -12,7 +15,21 @@ interface ErrorBoundaryState {
   error: Error | null
 }
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+/**
+ * React Error Boundary for crash recovery.
+ *
+ * Wraps the main application so that an unhandled rendering error doesn't
+ * blank the entire screen. Instead it shows a user-friendly message with a
+ * "Try again" button that resets the boundary state.
+ *
+ * Usage:
+ * ```tsx
+ * <ErrorBoundary>
+ *   <NoteApp />
+ * </ErrorBoundary>
+ * ```
+ */
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props)
     this.state = { hasError: false, error: null }
@@ -22,49 +39,50 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true, error }
   }
 
-  handleReset = () => {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log the error in development only (respects the logger pattern)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[ErrorBoundary] Uncaught error:', error, errorInfo)
+    }
+  }
+
+  handleRetry = () => {
     this.setState({ hasError: false, error: null })
   }
 
-  handleReload = () => {
-    window.location.reload()
-  }
-
   render() {
-    if (this.state.hasError) {
+    if (this.state.hasError && this.state.error) {
+      if (this.props.fallback) {
+        return this.props.fallback(this.state.error, this.handleRetry)
+      }
+
       return (
-        <div className="h-screen w-screen flex items-center justify-center bg-background p-8">
-          <div className="max-w-md text-center space-y-4">
-            <div className="rounded-2xl bg-destructive/10 p-4 mx-auto w-fit">
-              <svg
-                className="h-8 w-8 text-destructive"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
-                />
-              </svg>
+        <div className="flex items-center justify-center h-screen w-screen bg-background">
+          <div className="flex flex-col items-center gap-6 max-w-md p-8 text-center">
+            <div className="rounded-2xl bg-destructive/10 p-4">
+              <AlertTriangle className="h-10 w-10 text-destructive" />
             </div>
-            <h2 className="text-xl font-semibold tracking-tight">Something went wrong</h2>
-            <p className="text-sm text-muted-foreground">
-              NoteCraft encountered an unexpected error. Your notes are safely stored in your browser.
-            </p>
-            {this.state.error && (
-              <pre className="text-xs text-muted-foreground bg-muted rounded-md p-3 overflow-auto max-h-32 text-left">
-                {this.state.error.message}
-              </pre>
-            )}
-            <div className="flex gap-2 justify-center">
-              <Button variant="outline" onClick={this.handleReset}>
-                Try Again
+            <div>
+              <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
+              <p className="text-sm text-muted-foreground mb-1">
+                An unexpected error occurred. Your notes are safe — they are stored locally in your browser.
+              </p>
+              {process.env.NODE_ENV === 'development' && (
+                <pre className="mt-3 text-left text-xs bg-muted p-3 rounded-md overflow-auto max-h-32 text-destructive">
+                  {this.state.error.message}
+                </pre>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <Button onClick={this.handleRetry} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Try again
               </Button>
-              <Button onClick={this.handleReload}>
-                Reload App
+              <Button
+                variant="outline"
+                onClick={() => window.location.reload()}
+              >
+                Reload page
               </Button>
             </div>
           </div>

@@ -160,7 +160,6 @@ This text is visible. %%This text is hidden in the preview%% And this is also vi
 - [x] Build custom extension plugin
 - [x] Implement markdown-it rendering engine
 - [x] Add emoji, definition lists, front matter, foldable callouts
-- [x] Add scroll sync between editor and preview (split view)
 - [x] Add note search within content
 
 ## Tables
