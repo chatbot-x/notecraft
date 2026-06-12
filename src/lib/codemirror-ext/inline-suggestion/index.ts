@@ -47,11 +47,6 @@ export interface InlineSuggestionOptions {
   accept_shortcut?: string | null
 }
 
-export interface ForceableInlineSuggestionResult {
-  extension: Extension[]
-  force_fetch: () => void
-}
-
 // ─── State ─────────────────────────────────────────────────────────────────────
 
 type SuggestionState =
@@ -294,39 +289,4 @@ export function inlineSuggestion(options: InlineSuggestionOptions): Extension[] 
   ]
 }
 
-/**
- * Create a forceable inline suggestion extension.
- * Returns both the extension and a `force_fetch` function for manual triggering.
- *
- * Usage:
- * ```ts
- * const { extension, force_fetch } = forceableInlineSuggestion({
- *   fetchFn: async (state) => await callAI(state.doc.toString()),
- * })
- *
- * // Use extension in editor
- * // Call force_fetch() to manually trigger a suggestion
- * ```
- */
-export function forceableInlineSuggestion(options: InlineSuggestionOptions): ForceableInlineSuggestionResult {
-  const {
-    fetchFn,
-    delay = 500,
-    continue_suggesting = false,
-    accept_shortcut = 'Tab',
-  } = options
 
-  const forceFnRef: { current: (() => void) | null } = { current: null }
-
-  return {
-    extension: [
-      suggestionField,
-      suggestionDecorator,
-      createFetchPlugin(fetchFn, delay, continue_suggesting, forceFnRef),
-      createAcceptKeymap(accept_shortcut),
-      dismissKeymap,
-      suggestionStyles,
-    ],
-    force_fetch: () => forceFnRef.current?.(),
-  }
-}

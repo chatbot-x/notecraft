@@ -5,7 +5,7 @@
  * This is an editing-only module — no rendering engine.
  *
  * Features:
- * - Generate GitHub-style slugs from heading text (via github-slugger)
+ * - Generate GitHub-style slugs from heading text
  * - Generate heading ID attributes for markdown export
  * - Detect duplicate headings with suffix numbering
  * - Support explicit {#custom-slug} syntax
@@ -43,9 +43,6 @@ export function parseHeading(line: string): { level: number; title: string; cust
 
 /**
  * Generate a slug from heading text using GitHub-style rules.
- * This mirrors github-slugger's algorithm without the runtime dependency
- * for the basic case. For full GitHub compatibility with emoji/unicode,
- * use `generateSlugWithSlugger()` instead.
  */
 export function generateSlug(text: string): string {
   return text
@@ -59,32 +56,6 @@ export function generateSlug(text: string): string {
     .replace(/[\s_]+/g, '-')
     // Remove leading/trailing hyphens
     .replace(/^-+|-+$/g, '')
-}
-
-// Lazy-loaded github-slugger for full compatibility
-let SluggerClass: any = null
-
-async function loadSlugger(): Promise<any> {
-  if (!SluggerClass) {
-    const mod = await import('github-slugger')
-    SluggerClass = mod.default || mod
-  }
-  return new SluggerClass()
-}
-
-/**
- * Generate a slug using the full github-slugger library.
- * Handles emoji, unicode, and duplicate heading suffixes correctly.
- */
-export async function generateSlugWithSlugger(text: string, seenSlugs?: Set<string>): Promise<string> {
-  const slugger = await loadSlugger()
-  // If we have seen slugs, replay them for proper duplicate tracking
-  if (seenSlugs) {
-    for (const slug of seenSlugs) {
-      slugger.slug(slug)
-    }
-  }
-  return slugger.slug(text)
 }
 
 /**
@@ -126,8 +97,6 @@ export function scanDocumentHeadings(doc: string): Map<number, { level: number; 
   return result
 }
 
-
-
 /**
  * Jump to a heading by its slug. Searches the document for a heading
  * whose generated or custom slug matches the input.
@@ -152,16 +121,3 @@ export function jumpToHeading(slug: string): Command {
     return false
   }
 }
-
-/**
- * Get the slug of the heading at the current cursor position.
- * Returns null if not on a heading line.
- */
-export function getCurrentHeadingSlug(view: EditorView): string | null {
-  const line = view.state.doc.lineAt(view.state.selection.main.head)
-  const parsed = parseHeading(line.text)
-  if (!parsed) return null
-  return parsed.customSlug || generateSlug(parsed.title)
-}
-
-

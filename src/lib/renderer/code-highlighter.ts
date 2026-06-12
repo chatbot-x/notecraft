@@ -38,11 +38,6 @@ async function getHighlighter(isDark: boolean): Promise<Highlighter> {
   return highlighterPromise
 }
 
-/** Invalidate the cached highlighter (e.g., on theme change) */
-export function invalidateHighlighter(): void {
-  highlighterPromise = null
-}
-
 export interface HighlightOptions {
   isDark: boolean
   showLineNumbers?: boolean

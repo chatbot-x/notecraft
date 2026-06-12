@@ -26,7 +26,6 @@ export interface MermaidPluginOptions {
 export default function mermaidPlugin(md: MarkdownIt, options: MermaidPluginOptions = {}): void {
   const containerClass = options.containerClass ?? 'mermaid-container'
   const loadingClass = options.loadingClass ?? 'mermaid-loading'
-  const _errorClass = options.errorClass ?? 'mermaid-error'
 
   // Intercept the fence renderer to catch ```mermaid blocks
   const defaultFenceRenderer =

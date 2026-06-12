@@ -180,10 +180,4 @@ export function slashCommands(options?: {
   })
 }
 
-/**
- * Register custom slash commands.
- * Call this before creating the editor if you want to customize the commands.
- */
-export function registerSlashCommands(commands: SlashCommandOption[]) {
-  cachedCommands = commands
-}
+

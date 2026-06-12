@@ -7,7 +7,7 @@
  */
 'use client'
 
-import { EditorView, type PluginValue, ViewPlugin, ViewUpdate, type Command } from '@codemirror/view'
+import { EditorView, type PluginValue, ViewPlugin, ViewUpdate } from '@codemirror/view'
 
 /**
  * The toolbar plugin stores a reference to the EditorView
@@ -42,12 +42,4 @@ export const toolbarPlugin = ViewPlugin.define((view) => new ToolbarPlugin(view)
 export function getToolbarContainer(view: EditorView): HTMLDivElement | null {
   const plugin = view.plugin(toolbarPlugin)
   return plugin?.container ?? null
-}
-
-/**
- * Execute a toolbar command on the given editor view.
- */
-export function executeToolbarCommand(view: EditorView, command: Command) {
-  command(view)
-  view.focus()
 }

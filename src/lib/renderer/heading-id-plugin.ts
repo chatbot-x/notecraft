@@ -1,28 +1,15 @@
 /**
  * Custom markdown-it plugin that adds id attributes to headings for anchor linking.
  *
- * Generates slug-based IDs using a simple algorithm:
- * 1. Strip HTML tags
- * 2. Lowercase
- * 3. Replace non-alphanumeric sequences with hyphens
- * 4. Remove leading/trailing hyphens
- * 5. Deduplicate by appending -1, -2, etc.
+ * Generates slug-based IDs using the same algorithm as the editor slug module
+ * (generateSlug from @codemirror-ext/slug) for consistency between editor
+ * and preview. Deduplicates by appending -1, -2, etc.
  *
  * Also wraps heading content in an anchor tag for clickability.
  */
 
 import type MarkdownIt from 'markdown-it'
-
-function slugify(text: string): string {
-  return text
-    .replace(/<[^>]+>/g, '')           // strip HTML
-    .replace(/[^\w\s-]/g, '')          // remove non-word chars (keep unicode letters)
-    .trim()
-    .toLowerCase()
-    .replace(/[\s]+/g, '-')            // spaces → hyphens
-    .replace(/-+/g, '-')               // collapse multiple hyphens
-    .replace(/^-|-$/g, '')             // trim hyphens
-}
+import { generateSlug } from '@/lib/codemirror-ext/slug'
 
 export default function headingIdPlugin(md: MarkdownIt): void {
   const originalHeadingOpen =
@@ -43,7 +30,7 @@ export default function headingIdPlugin(md: MarkdownIt): void {
     }
 
     // Generate the slug
-    const baseSlug = slugify(rawText) || `heading-${headingLevel}`
+    const baseSlug = generateSlug(rawText) || `heading-${headingLevel}`
 
     // Track duplicate slugs via env
     if (!env.__headingSlugs) {

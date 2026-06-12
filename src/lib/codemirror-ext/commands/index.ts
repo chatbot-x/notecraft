@@ -415,15 +415,6 @@ export const table: Command = (view) => {
 
 // ─── Document Formatting ─────────────────────────────────────────────────────
 
-export interface FormatDocumentOptions {
-  /** Print width for formatting (default: 80) */
-  printWidth?: number
-  /** Use single quotes where possible (default: false) */
-  singleQuote?: boolean
-  /** Prose wrapping mode: 'always' | 'never' | 'preserve' (default: 'preserve') */
-  proseWrap?: 'always' | 'never' | 'preserve'
-}
-
 /**
  * Format the entire markdown document using Prettier's built-in markdown parser.
  * No additional plugins needed — Prettier 3.x includes markdown support natively.
@@ -520,64 +511,4 @@ export const formatDocument: Command = (view): boolean => {
   return true
 }
 
-/**
- * Create a formatDocument command with custom Prettier options.
- */
-export function createFormatCommand(options: FormatDocumentOptions): Command {
-  return (view): boolean => {
-    const { state } = view
-    const content = state.doc.toString()
-    const cursorPos = state.selection.main.head
-    const cursorLine = state.doc.lineAt(cursorPos)
-    const cursorLineText = cursorLine.text
-    const cursorColumn = cursorPos - cursorLine.from
 
-    prettier.format(content, {
-      parser: 'markdown',
-      printWidth: options.printWidth ?? 80,
-      proseWrap: options.proseWrap ?? 'preserve',
-    }).then((formatted) => {
-      if (formatted === content) {
-        view.focus()
-        return
-      }
-
-      const lines = formatted.split('\n')
-      let bestLine = Math.min(cursorLine.number - 1, lines.length - 1)
-      if (cursorLineText.trim()) {
-        const searchStart = Math.max(0, cursorLine.number - 3)
-        const searchEnd = Math.min(lines.length, cursorLine.number + 3)
-        for (let i = searchStart; i < searchEnd; i++) {
-          if (lines[i] && lines[i].includes(cursorLineText.trim().slice(0, 30))) {
-            bestLine = i
-            break
-          }
-        }
-      }
-
-      // Compute cursor position from the FORMATTED content before dispatching
-      const targetLineIndex = bestLine + 1
-      const totalLines = lines.length
-      const clampedLine = targetLineIndex > totalLines ? totalLines : targetLineIndex
-      let targetPos = 0
-      for (let i = 0; i < clampedLine - 1; i++) {
-        targetPos += lines[i].length + 1
-      }
-      const targetLineContent = lines[clampedLine - 1] || ''
-      const col = Math.min(cursorColumn, targetLineContent.length)
-      targetPos += col
-
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: formatted },
-        selection: EditorSelection.cursor(targetPos),
-      })
-
-      view.focus()
-    }).catch((err) => {
-      logger.warn('Markdown formatting failed:', err)
-      view.focus()
-    })
-
-    return true
-  }
-}

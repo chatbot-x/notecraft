@@ -7,9 +7,8 @@
  * - codemirror-markdown-image (yeliex) → Image upload with progress, drag-drop, paste
  * - codemirror-companion-extension (rizerphe) → Stabilized inline AI suggestions
  * - codemirror-final-newline (yeliex) → Configurable trailing newline
- * - NEW: Slash commands via @codemirror/autocomplete
- * - NEW: Heading slug utilities (heading anchor generation, panel removed)
- * - NEW: Hybrid render — Obsidian-style Live Preview decorations
+ * - Slash commands via @codemirror/autocomplete
+ * - Hybrid render — Obsidian-style Live Preview decorations
  *
  * Usage:
  * ```ts
@@ -29,39 +28,37 @@ export {
   // Insert commands
   link, image, codeBlock, horizontalRule, table,
   // Document formatting
-  formatDocument, createFormatCommand,
+  formatDocument,
   // List factory
   createList,
   // Callout commands
   createCallout,
 } from './commands'
-export type { FormatDocumentOptions } from './commands'
 
 // Toolbar
 export { Toolbar, defaultToolbarItems } from './toolbar/component'
-export { toolbarPlugin, getToolbarContainer, executeToolbarCommand } from './toolbar/plugin'
+export { toolbarPlugin } from './toolbar/plugin'
 export type { ToolbarItem, ToolbarItemConfig, ToolbarSeparator, ToolbarSpacer, ToolbarGroup, ToolbarDropdown, ToolbarDropdownItem } from './toolbar/types'
 
 // Slash commands
-export { slashCommands, registerSlashCommands } from './slash'
+export { slashCommands } from './slash'
 export type { SlashCommandOption } from './slash'
 
 // Theme
 export { editorExtTheme } from './theme'
 
 // Image upload
-export { imageUpload, createImageUploadCommand, imageStatusLinter } from './image'
+export { imageUpload, createImageUploadCommand } from './image'
 export type { ImageUploadOptions, UploadCallback, UploadActionParams } from './image'
 
 // Inline suggestion
-export { inlineSuggestion, forceableInlineSuggestion } from './inline-suggestion'
-export type { InlineSuggestionOptions, Suggestion, ForceableInlineSuggestionResult } from './inline-suggestion'
+export { inlineSuggestion } from './inline-suggestion'
+export type { InlineSuggestionOptions, Suggestion } from './inline-suggestion'
 
-// Slug utilities (heading anchor/slug generation — panel removed)
+// Slug utilities (heading anchor generation)
 export {
   jumpToHeading,
-  generateSlug, generateSlugWithSlugger, parseHeading, scanDocumentHeadings,
-  getCurrentHeadingSlug,
+  generateSlug, parseHeading, scanDocumentHeadings,
 } from './slug'
 
 // Final newline
